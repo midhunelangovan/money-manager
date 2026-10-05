@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart' hide DatabaseException;
+import 'package:sqflite/sqflite.dart' hide DatabaseException;
 import '../constants/app_constants.dart';
 import '../error/exceptions.dart';
 import 'database_migrations.dart';
@@ -26,13 +26,8 @@ class AppDatabase {
     _instance = testInstance;
   }
 
-  /// Initialize sqflite FFI for desktop & tests if necessary
-  static void initializeFfiIfRequired() {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    }
-  }
+  /// Initialize sqflite for mobile / desktop
+  static void initializeFfiIfRequired() {}
 
   static Database? _database;
 
