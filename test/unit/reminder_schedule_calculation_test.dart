@@ -11,10 +11,26 @@ void main() {
     tz.setLocalLocation(tz.getLocation('UTC'));
   });
 
+  group('Deterministic Stable Notification ID Tests', () {
+    test('Notification ID is deterministic and positive 31-bit integer', () {
+      const id1 = 'rem_123456789';
+      const id2 = 'rem_987654321';
+
+      final nid1_a = NotificationService.getNotificationId(id1);
+      final nid1_b = NotificationService.getNotificationId(id1);
+      final nid2 = NotificationService.getNotificationId(id2);
+
+      expect(nid1_a, nid1_b, reason: 'Must be 100% deterministic');
+      expect(nid1_a != nid2, true, reason: 'Different IDs produce different hash codes');
+      expect(nid1_a > 0, true, reason: 'Must be strictly positive');
+      expect(nid1_a <= 0x7FFFFFFF, true, reason: 'Must fit in positive 31-bit int');
+    });
+  });
+
   group('Reminder calculateNextTrigger Edge Case Tests', () {
     final notificationService = NotificationService();
 
-    test('One-time reminder returns exact scheduled time', () {
+    test('One-time reminder returns exact scheduled time in future', () {
       final reminder = Reminder(
         id: 'r_once',
         name: 'Electricity Bill',
@@ -34,6 +50,29 @@ void main() {
       expect(trigger.day, 15);
       expect(trigger.hour, 9);
       expect(trigger.minute, 0);
+    });
+
+    test('One-time reminder 1 minute in the future on same day', () {
+      final reminder = Reminder(
+        id: 'r_once_1min',
+        name: 'Quick Test Reminder',
+        frequency: ReminderFrequency.once,
+        date: DateTime(2026, 10, 5),
+        time: const TimeOfDay(hour: 14, minute: 31),
+        isEnabled: true,
+        createdAt: DateTime(2026, 10, 5),
+        updatedAt: DateTime(2026, 10, 5),
+      );
+
+      final now = tz.TZDateTime(tz.local, 2026, 10, 5, 14, 30, 0);
+      final trigger = notificationService.calculateNextTrigger(reminder, now);
+
+      expect(trigger.year, 2026);
+      expect(trigger.month, 10);
+      expect(trigger.day, 5);
+      expect(trigger.hour, 14);
+      expect(trigger.minute, 31);
+      expect(trigger.isAfter(now), true);
     });
 
     test('Daily reminder schedules today if before time, tomorrow if after time', () {
@@ -150,6 +189,33 @@ void main() {
       expect(trigger2028.year, 2028);
       expect(trigger2028.month, 2);
       expect(trigger2028.day, 29);
+    });
+
+    test('Calculates triggers correctly across distinct regional timezones (e.g. Asia/Kolkata)', () {
+      final kolkataLocation = tz.getLocation('Asia/Kolkata');
+      tz.setLocalLocation(kolkataLocation);
+
+      final reminder = Reminder(
+        id: 'r_ist',
+        name: 'Evening Medication',
+        frequency: ReminderFrequency.daily,
+        date: DateTime(2026, 10, 5),
+        time: const TimeOfDay(hour: 20, minute: 30),
+        isEnabled: true,
+        createdAt: DateTime(2026, 10, 5),
+        updatedAt: DateTime(2026, 10, 5),
+      );
+
+      final nowIST = tz.TZDateTime(kolkataLocation, 2026, 10, 5, 20, 0); // 8:00 PM IST
+      final trigger = notificationService.calculateNextTrigger(reminder, nowIST);
+
+      expect(trigger.hour, 20);
+      expect(trigger.minute, 30);
+      expect(trigger.day, 5);
+      expect(trigger.location.name, 'Asia/Kolkata');
+
+      // Reset
+      tz.setLocalLocation(tz.getLocation('UTC'));
     });
   });
 }

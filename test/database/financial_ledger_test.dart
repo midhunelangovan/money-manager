@@ -20,6 +20,7 @@ import 'package:kals_money_manager/core/database/app_database.dart';
 
 void main() {
   setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   });
@@ -164,13 +165,23 @@ void main() {
 
     test('Recurring transaction processor is strictly idempotent and prevents duplicates', () async {
       final now = DateTime.now();
-      final accounts = await accountRepo.getAllAccounts();
+      final account = Account(
+        id: 'acc_rent_source',
+        name: 'Bank Checking',
+        accountType: AccountType.bank,
+        openingBalance: const Money(units: 5000000),
+        color: 0xFF1E3A5F,
+        icon: 'account_balance',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await accountRepo.createAccount(account);
       final cats = await categoryRepo.getAllCategories(type: CategoryType.expense);
 
       final recurringSchedule = RecurringTransaction(
         id: 'rec_rent_101',
         transactionType: CategoryType.expense,
-        accountId: accounts.first.id,
+        accountId: account.id,
         categoryId: cats.first.id,
         amount: const Money(units: 1500000), // ₹15,000
         description: 'House Rent',

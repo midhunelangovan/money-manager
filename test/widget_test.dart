@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kals_money_manager/core/database/app_database.dart';
 import 'package:kals_money_manager/core/database/database_migrations.dart';
+import 'package:kals_money_manager/core/services/notification_service.dart';
 import 'package:kals_money_manager/core/utilities/money.dart';
 import 'package:kals_money_manager/features/accounts/data/repositories/account_repository_impl.dart';
 import 'package:kals_money_manager/features/accounts/domain/entities/account.dart';
@@ -28,19 +29,10 @@ import 'package:kals_money_manager/main.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' hide Transaction;
 
-import 'package:flutter/services.dart';
-
 void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      const MethodChannel('dexterous.com/flutter/local_notifications'),
-      (MethodCall methodCall) async => true,
-    );
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      const MethodChannel('flutter_timezone'),
-      (MethodCall methodCall) async => 'UTC',
-    );
+    NotificationService.isTestMode = true;
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   });
@@ -92,25 +84,29 @@ void main() {
     settings.setPrimaryAccountId(account.id);
     settings.setOnboardingCompleted(true);
 
+    final accProvider = AccountProvider(repository: accountRepo);
+    await accProvider.loadAccounts();
+    final catProvider = CategoryProvider(repository: categoryRepo);
+    await catProvider.loadCategories();
+    final txProvider = TransactionProvider(repository: txRepo);
+    await txProvider.loadLedger();
+    final transferProvider = TransferProvider(repository: transferRepo);
+    await transferProvider.loadTransfers();
+    final recurringProvider = RecurringProvider(repository: recurringRepo, processor: recurringProcessor);
+    await recurringProvider.loadRecurring();
+    final reminderProvider = ReminderProvider(repository: reminderRepo);
+    await reminderProvider.loadReminders();
+
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: settings),
-          ChangeNotifierProvider(create: (_) => AccountProvider(repository: accountRepo)..loadAccounts()),
-          ChangeNotifierProvider(create: (_) => CategoryProvider(repository: categoryRepo)..loadCategories()),
-          ChangeNotifierProvider(create: (_) => TransactionProvider(repository: txRepo)..loadLedger()),
-          ChangeNotifierProvider(create: (_) => TransferProvider(repository: transferRepo)..loadTransfers()),
-          ChangeNotifierProvider(
-            create: (_) => RecurringProvider(
-              repository: recurringRepo,
-              processor: recurringProcessor,
-            )..loadRecurring(),
-          ),
-          ChangeNotifierProvider(
-            create: (_) => ReminderProvider(
-              repository: reminderRepo,
-            )..loadReminders(),
-          ),
+          ChangeNotifierProvider.value(value: accProvider),
+          ChangeNotifierProvider.value(value: catProvider),
+          ChangeNotifierProvider.value(value: txProvider),
+          ChangeNotifierProvider.value(value: transferProvider),
+          ChangeNotifierProvider.value(value: recurringProvider),
+          ChangeNotifierProvider.value(value: reminderProvider),
           ChangeNotifierProvider(
             create: (_) => BackupProvider(
               backupService: backupService,
@@ -129,8 +125,7 @@ void main() {
     );
 
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 100));
 
     // Verify Dashboard UI elements
     expect(find.text('EXPENSES'), findsOneWidget);
@@ -139,9 +134,5 @@ void main() {
     expect(find.text('Transactions'), findsOneWidget);
     expect(find.text('Accounts'), findsOneWidget);
     expect(find.text('Reports'), findsOneWidget);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await db.close();
   });
 }
-

@@ -29,7 +29,7 @@ class ReminderProvider extends ChangeNotifier {
     try {
       _reminders = await _repository.getAllReminders();
       // Synchronize and register active reminders with notification service
-      _notificationService.rescheduleAllActiveReminders(_reminders);
+      await _notificationService.rescheduleAllActiveReminders(_reminders);
     } catch (e) {
       _errorMessage = 'Failed to load reminders: $e';
     } finally {
@@ -48,7 +48,13 @@ class ReminderProvider extends ChangeNotifier {
 
   Future<void> addReminder(Reminder reminder) async {
     try {
+      if (kDebugMode) {
+        debugPrint('[REMINDER_CREATED] id: ${reminder.id}, name: "${reminder.name}", freq: ${reminder.frequency.name}, date: ${reminder.date.toIso8601String()}, time: ${reminder.time.hour}:${reminder.time.minute}');
+      }
       await _repository.insertReminder(reminder);
+      if (kDebugMode) {
+        debugPrint('[REMINDER_PERSISTED] id: ${reminder.id}');
+      }
       if (reminder.isEnabled) {
         await _notificationService.scheduleReminder(reminder);
       }
@@ -62,7 +68,13 @@ class ReminderProvider extends ChangeNotifier {
 
   Future<void> updateReminder(Reminder reminder) async {
     try {
+      if (kDebugMode) {
+        debugPrint('[REMINDER_UPDATED] id: ${reminder.id}, name: "${reminder.name}", enabled: ${reminder.isEnabled}');
+      }
       await _repository.updateReminder(reminder);
+      if (kDebugMode) {
+        debugPrint('[REMINDER_PERSISTED] id: ${reminder.id}');
+      }
       if (reminder.isEnabled) {
         await _notificationService.scheduleReminder(reminder);
       } else {
@@ -82,7 +94,13 @@ class ReminderProvider extends ChangeNotifier {
         isEnabled: !reminder.isEnabled,
         updatedAt: DateTime.now(),
       );
+      if (kDebugMode) {
+        debugPrint('[REMINDER_TOGGLED] id: ${updated.id}, isEnabled: ${updated.isEnabled}');
+      }
       await _repository.updateReminder(updated);
+      if (kDebugMode) {
+        debugPrint('[REMINDER_PERSISTED] id: ${updated.id}');
+      }
       if (updated.isEnabled) {
         await _notificationService.scheduleReminder(updated);
       } else {
@@ -99,6 +117,9 @@ class ReminderProvider extends ChangeNotifier {
     try {
       await _notificationService.cancelReminder(id);
       await _repository.deleteReminder(id);
+      if (kDebugMode) {
+        debugPrint('[REMINDER_DELETED] id: $id');
+      }
       await loadReminders();
     } catch (e) {
       _errorMessage = 'Failed to delete reminder: $e';

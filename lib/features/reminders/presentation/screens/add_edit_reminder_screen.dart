@@ -363,6 +363,44 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
                             onTap: _pickTime,
                             isDark: isDark,
                           ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              ActionChip(
+                                avatar: const Icon(Icons.timer_outlined, size: 16, color: AppColors.primary),
+                                label: const Text('+1 Min (Test)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                backgroundColor: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.08),
+                                side: BorderSide.none,
+                                onPressed: () {
+                                  final testTime = DateTime.now().add(const Duration(minutes: 1));
+                                  setState(() {
+                                    _selectedDate = DateTime(testTime.year, testTime.month, testTime.day);
+                                    _selectedTime = TimeOfDay(hour: testTime.hour, minute: testTime.minute);
+                                    if (_nameController.text.trim().isEmpty) {
+                                      _nameController.text = 'Test Reminder (+1 min)';
+                                    }
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              ActionChip(
+                                avatar: const Icon(Icons.timer_outlined, size: 16, color: AppColors.primary),
+                                label: const Text('+2 Min (Test)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                backgroundColor: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.08),
+                                side: BorderSide.none,
+                                onPressed: () {
+                                  final testTime = DateTime.now().add(const Duration(minutes: 2));
+                                  setState(() {
+                                    _selectedDate = DateTime(testTime.year, testTime.month, testTime.day);
+                                    _selectedTime = TimeOfDay(hour: testTime.hour, minute: testTime.minute);
+                                    if (_nameController.text.trim().isEmpty) {
+                                      _nameController.text = 'Test Reminder (+2 min)';
+                                    }
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 16),
                           AppTextField(
                             controller: _commentController,

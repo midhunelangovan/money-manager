@@ -13,6 +13,7 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
+  static bool isTestMode = false;
 
   static const String channelId = 'kals_reminders_channel';
   static const String channelName = 'Personal Reminders';
@@ -21,19 +22,30 @@ class NotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
+    if (isTestMode) {
+      tz.initializeTimeZones();
+      tz.setLocalLocation(tz.getLocation('UTC'));
+      _isInitialized = true;
+      return;
+    }
+
     try {
       tz.initializeTimeZones();
       try {
         final tzInfo = await FlutterTimezone.getLocalTimezone().timeout(
           const Duration(seconds: 2),
-          onTimeout: () => TimezoneInfo(identifier: 'UTC'),
         );
-        tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
+        final String identifier = tzInfo.identifier;
+        final location = _findMatchingLocation(identifier);
+        tz.setLocalLocation(location);
+        if (kDebugMode) {
+          debugPrint('NotificationService: Local timezone initialized: ${tz.local.name}');
+        }
       } catch (e) {
         if (kDebugMode) {
           debugPrint('NotificationService: Local timezone fallback: $e');
         }
-        tz.setLocalLocation(tz.local);
+        _configureFallbackTimezone();
       }
 
       const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -52,12 +64,9 @@ class NotificationService {
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           if (kDebugMode) {
-            debugPrint('NotificationService: Clicked ${response.payload}');
+            debugPrint('[REMINDER_NOTIFICATION_CLICKED] payload: ${response.payload}');
           }
         },
-      ).timeout(
-        const Duration(seconds: 1),
-        onTimeout: () => false,
       );
 
       if (Platform.isAndroid) {
@@ -73,9 +82,6 @@ class NotificationService {
               playSound: true,
               enableVibration: true,
             ),
-          ).timeout(
-            const Duration(seconds: 1),
-            onTimeout: () {},
           );
         }
       }
@@ -88,6 +94,45 @@ class NotificationService {
     }
   }
 
+  static tz.Location _findMatchingLocation(String identifier) {
+    if (tz.timeZoneDatabase.locations.containsKey(identifier)) {
+      return tz.getLocation(identifier);
+    }
+    // Try case-insensitive match
+    for (final entry in tz.timeZoneDatabase.locations.entries) {
+      if (entry.key.toLowerCase() == identifier.toLowerCase()) {
+        return entry.value;
+      }
+    }
+    // Try offset match
+    final offset = DateTime.now().timeZoneOffset;
+    for (final location in tz.timeZoneDatabase.locations.values) {
+      final tzNow = tz.TZDateTime.now(location);
+      if (tzNow.timeZoneOffset == offset) {
+        return location;
+      }
+    }
+    return tz.getLocation('UTC');
+  }
+
+  static void _configureFallbackTimezone() {
+    try {
+      final offset = DateTime.now().timeZoneOffset;
+      for (final location in tz.timeZoneDatabase.locations.values) {
+        final tzNow = tz.TZDateTime.now(location);
+        if (tzNow.timeZoneOffset == offset) {
+          tz.setLocalLocation(location);
+          return;
+        }
+      }
+      tz.setLocalLocation(tz.getLocation('UTC'));
+    } catch (_) {
+      try {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      } catch (_) {}
+    }
+  }
+
   Future<bool> requestPermissions() async {
     try {
       await initialize();
@@ -97,7 +142,7 @@ class NotificationService {
         if (androidImpl != null) {
           final exactAlarm = await androidImpl.requestExactAlarmsPermission();
           final postNotifs = await androidImpl.requestNotificationsPermission();
-          return postNotifs ?? exactAlarm ?? true;
+          return (postNotifs ?? false) || (exactAlarm ?? false);
         }
       } else if (Platform.isIOS) {
         final iosImpl = _notificationsPlugin
@@ -117,8 +162,16 @@ class NotificationService {
     return false;
   }
 
-  int _getNotificationId(String id) {
-    return id.hashCode.abs() % 2147483647;
+  /// Generates a deterministic positive 31-bit integer hash from any string ID.
+  /// Guarantees that across process restarts and OS reboots, the same reminder ID
+  /// always maps to the exact same notification/alarm ID.
+  static int getNotificationId(String id) {
+    var hash = 0x811c9dc5;
+    for (int i = 0; i < id.length; i++) {
+      hash ^= id.codeUnitAt(i);
+      hash = (hash * 0x01000193) & 0x7FFFFFFF;
+    }
+    return hash == 0 ? 1 : hash;
   }
 
   Future<void> showTestNotification() async {
@@ -154,6 +207,9 @@ class NotificationService {
         'Your offline reminders and notifications are working properly!',
         notificationDetails,
       );
+      if (kDebugMode) {
+        debugPrint('[REMINDER_NOTIFICATION_SHOWN] Test notification fired successfully');
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('NotificationService: Test notification error: $e');
@@ -295,16 +351,28 @@ class NotificationService {
 
     try {
       await initialize();
-      final id = _getNotificationId(reminder.id);
+      final id = getNotificationId(reminder.id);
 
       // Cancel previous notification if any to prevent duplicates
-      await _notificationsPlugin.cancel(id).timeout(
-        const Duration(seconds: 1),
-        onTimeout: () {},
-      );
+      await _notificationsPlugin.cancel(id);
 
       final now = tz.TZDateTime.now(tz.local);
       final scheduledDateTime = calculateNextTrigger(reminder, now);
+
+      if (kDebugMode) {
+        debugPrint(
+          '[REMINDER_SCHEDULE_REQUESTED] id: ${reminder.id}, name: "${reminder.name}", '
+          'freq: ${reminder.frequency.name}, nowLocal: $now, targetLocal: $scheduledDateTime, '
+          'diffSec: ${scheduledDateTime.difference(now).inSeconds}',
+        );
+      }
+
+      if (isTestMode) {
+        if (kDebugMode) {
+          debugPrint('[REMINDER_SCHEDULED] (testMode) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
+        }
+        return;
+      }
 
       // If one-time or custom reminder is strictly in the past, do not schedule
       if ((reminder.frequency == ReminderFrequency.once || reminder.frequency == ReminderFrequency.custom) &&
@@ -367,12 +435,9 @@ class NotificationService {
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: matchComponents,
-        ).timeout(
-          const Duration(seconds: 1),
-          onTimeout: () {},
         );
         if (kDebugMode) {
-          debugPrint('NotificationService: Scheduled (exact) reminder "${reminder.name}" at $scheduledDateTime');
+          debugPrint('[REMINDER_SCHEDULED] (exact) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
         }
       } catch (e) {
         if (kDebugMode) {
@@ -387,10 +452,10 @@ class NotificationService {
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: matchComponents,
-        ).timeout(
-          const Duration(seconds: 1),
-          onTimeout: () {},
         );
+        if (kDebugMode) {
+          debugPrint('[REMINDER_SCHEDULED] (inexact) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
+        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -410,7 +475,7 @@ class NotificationService {
         }
       }
       if (kDebugMode) {
-        debugPrint('NotificationService: Rescheduled ${reminders.where((r) => r.isEnabled).length} active reminders');
+        debugPrint('[REMINDER_RESCHEDULED] Rescheduled ${reminders.where((r) => r.isEnabled).length} active reminders');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -421,13 +486,16 @@ class NotificationService {
 
   Future<void> cancelReminder(String reminderId) async {
     try {
-      final id = _getNotificationId(reminderId);
-      await _notificationsPlugin.cancel(id).timeout(
-        const Duration(seconds: 1),
-        onTimeout: () {},
-      );
+      final id = getNotificationId(reminderId);
+      if (isTestMode) {
+        if (kDebugMode) {
+          debugPrint('[REMINDER_CANCELLED] (testMode) id: $reminderId, scheduleId: $id');
+        }
+        return;
+      }
+      await _notificationsPlugin.cancel(id);
       if (kDebugMode) {
-        debugPrint('NotificationService: Cancelled reminder $reminderId');
+        debugPrint('[REMINDER_CANCELLED] id: $reminderId, scheduleId: $id');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -438,10 +506,10 @@ class NotificationService {
 
   Future<void> cancelAll() async {
     try {
-      await _notificationsPlugin.cancelAll().timeout(
-        const Duration(seconds: 1),
-        onTimeout: () {},
-      );
+      await _notificationsPlugin.cancelAll();
+      if (kDebugMode) {
+        debugPrint('NotificationService: Cancelled all notifications');
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('NotificationService: Error cancelling all notifications: $e');

@@ -15,6 +15,7 @@ import 'package:kals_money_manager/core/database/app_database.dart';
 
 void main() {
   setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   });

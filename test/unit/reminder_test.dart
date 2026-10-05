@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kals_money_manager/core/database/app_database.dart';
+import 'package:kals_money_manager/core/database/database_migrations.dart';
+import 'package:kals_money_manager/features/reminders/data/repositories/reminder_repository.dart';
 import 'package:kals_money_manager/features/reminders/domain/entities/reminder.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
   group('Reminder Entity & Serialization Tests', () {
     test('Reminder serializes toMap and deserializes fromMap accurately', () {
       final now = DateTime(2026, 10, 1, 10, 0);
@@ -65,6 +74,73 @@ void main() {
 
       expect(ReminderFrequency.daily.displayName, 'Every day');
       expect(ReminderFrequency.daily.shortName, 'Daily');
+    });
+  });
+
+  group('Reminder Database Repository Persistence Tests', () {
+    late Database db;
+    late AppDatabase appDb;
+    late ReminderRepository reminderRepo;
+
+    setUp(() async {
+      db = await openDatabase(
+        inMemoryDatabasePath,
+        version: 1,
+        onCreate: DatabaseMigrations.onCreate,
+      );
+      appDb = AppDatabase.withDatabase(db);
+      reminderRepo = ReminderRepository(db: appDb);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test('Insert, fetch by ID, update, toggle and delete lifecycle in SQLite', () async {
+      final now = DateTime.now();
+      final reminder = Reminder(
+        id: 'rem_db_test_1',
+        name: 'Car Insurance Due',
+        frequency: ReminderFrequency.yearly,
+        date: DateTime(2026, 11, 20),
+        time: const TimeOfDay(hour: 15, minute: 45),
+        comment: 'Policy #998811',
+        isEnabled: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      // 1. Insert
+      await reminderRepo.insertReminder(reminder);
+
+      // 2. Fetch all
+      final all = await reminderRepo.getAllReminders();
+      expect(all.length, 1);
+      expect(all.first.id, 'rem_db_test_1');
+      expect(all.first.name, 'Car Insurance Due');
+      expect(all.first.frequency, ReminderFrequency.yearly);
+      expect(all.first.time.hour, 15);
+      expect(all.first.time.minute, 45);
+      expect(all.first.comment, 'Policy #998811');
+      expect(all.first.isEnabled, true);
+
+      // 3. Update
+      final updated = all.first.copyWith(
+        name: 'Car Insurance Renewed',
+        isEnabled: false,
+        updatedAt: DateTime.now(),
+      );
+      await reminderRepo.updateReminder(updated);
+
+      final fetchedUpdated = await reminderRepo.getReminderById('rem_db_test_1');
+      expect(fetchedUpdated, isNotNull);
+      expect(fetchedUpdated!.name, 'Car Insurance Renewed');
+      expect(fetchedUpdated.isEnabled, false);
+
+      // 4. Delete
+      await reminderRepo.deleteReminder('rem_db_test_1');
+      final afterDelete = await reminderRepo.getAllReminders();
+      expect(afterDelete.isEmpty, true);
     });
   });
 }
