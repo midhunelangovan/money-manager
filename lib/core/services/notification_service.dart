@@ -354,32 +354,30 @@ class NotificationService {
       final id = getNotificationId(reminder.id);
 
       // Cancel previous notification if any to prevent duplicates
-      await _notificationsPlugin.cancel(id);
+      try {
+        await _notificationsPlugin.cancel(id);
+      } catch (e) {
+        debugPrint('NotificationService: Pre-cancel notification notice: $e');
+      }
 
       final now = tz.TZDateTime.now(tz.local);
       final scheduledDateTime = calculateNextTrigger(reminder, now);
 
-      if (kDebugMode) {
-        debugPrint(
-          '[REMINDER_SCHEDULE_REQUESTED] id: ${reminder.id}, name: "${reminder.name}", '
-          'freq: ${reminder.frequency.name}, nowLocal: $now, targetLocal: $scheduledDateTime, '
-          'diffSec: ${scheduledDateTime.difference(now).inSeconds}',
-        );
-      }
+      debugPrint(
+        '[REMINDER_SCHEDULE_REQUESTED] id: ${reminder.id}, name: "${reminder.name}", '
+        'freq: ${reminder.frequency.name}, nowLocal: $now, targetLocal: $scheduledDateTime, '
+        'diffSec: ${scheduledDateTime.difference(now).inSeconds}',
+      );
 
       if (isTestMode) {
-        if (kDebugMode) {
-          debugPrint('[REMINDER_SCHEDULED] (testMode) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
-        }
+        debugPrint('[REMINDER_SCHEDULED] (testMode) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
         return;
       }
 
       // If one-time or custom reminder is strictly in the past, do not schedule
       if ((reminder.frequency == ReminderFrequency.once || reminder.frequency == ReminderFrequency.custom) &&
           scheduledDateTime.isBefore(now)) {
-        if (kDebugMode) {
-          debugPrint('NotificationService: One-time reminder is in the past, skipping: ${reminder.id}');
-        }
+        debugPrint('NotificationService: One-time reminder is in the past, skipping: ${reminder.id}');
         return;
       }
 
@@ -436,13 +434,9 @@ class NotificationService {
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: matchComponents,
         );
-        if (kDebugMode) {
-          debugPrint('[REMINDER_SCHEDULED] (exact) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
-        }
+        debugPrint('[REMINDER_SCHEDULED] (exact) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
       } catch (e) {
-        if (kDebugMode) {
-          debugPrint('NotificationService: Exact alarm fallback to inexact: $e');
-        }
+        debugPrint('NotificationService: Exact alarm fallback to inexact: $e');
         await _notificationsPlugin.zonedSchedule(
           id,
           reminder.name,
@@ -453,14 +447,10 @@ class NotificationService {
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: matchComponents,
         );
-        if (kDebugMode) {
-          debugPrint('[REMINDER_SCHEDULED] (inexact) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
-        }
+        debugPrint('[REMINDER_SCHEDULED] (inexact) id: ${reminder.id}, scheduleId: $id, trigger: $scheduledDateTime');
       }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('NotificationService: Error scheduling reminder: $e');
-      }
+    } catch (e, stack) {
+      debugPrint('NotificationService: Error scheduling reminder: $e\n$stack');
     }
   }
 
