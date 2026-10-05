@@ -36,11 +36,25 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
   void initState() {
     super.initState();
     final reminder = widget.initialReminder;
+    final now = DateTime.now();
     _nameController = TextEditingController(text: reminder?.name ?? '');
     _commentController = TextEditingController(text: reminder?.comment ?? '');
     _frequency = reminder?.frequency ?? ReminderFrequency.once;
-    _selectedDate = reminder?.date ?? DateTime.now();
-    _selectedTime = reminder?.time ?? const TimeOfDay(hour: 9, minute: 0);
+
+    if (reminder != null) {
+      // If editing a one-time reminder that was saved on an earlier date, default to today so new times are valid
+      final reminderDateOnly = DateTime(reminder.date.year, reminder.date.month, reminder.date.day);
+      final todayDateOnly = DateTime(now.year, now.month, now.day);
+      if (_frequency == ReminderFrequency.once && reminderDateOnly.isBefore(todayDateOnly)) {
+        _selectedDate = todayDateOnly;
+      } else {
+        _selectedDate = reminder.date;
+      }
+      _selectedTime = reminder.time;
+    } else {
+      _selectedDate = DateTime(now.year, now.month, now.day);
+      _selectedTime = const TimeOfDay(hour: 9, minute: 0);
+    }
   }
 
   @override
@@ -83,7 +97,7 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurface,
+      backgroundColor: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -106,7 +120,7 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
                     ),
                   ),
                 ),
-                const Divider(),
+                Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                 ...ReminderFrequency.values.map((freq) {
                   final isSelected = freq == _frequency;
                   return ListTile(
@@ -125,7 +139,16 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
                         ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
                         : null,
                     onTap: () {
-                      setState(() => _frequency = freq);
+                      setState(() {
+                        _frequency = freq;
+                        if (freq == ReminderFrequency.once) {
+                          final now = DateTime.now();
+                          final todayDateOnly = DateTime(now.year, now.month, now.day);
+                          if (_selectedDate.isBefore(todayDateOnly)) {
+                            _selectedDate = todayDateOnly;
+                          }
+                        }
+                      });
                       Navigator.pop(ctx);
                     },
                   );
@@ -145,13 +168,35 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
       return;
     }
 
+    final now = DateTime.now();
+
+    // Check if one-time reminder is set to the past
+    if (_frequency == ReminderFrequency.once) {
+      final scheduledTarget = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _selectedTime.hour,
+        _selectedTime.minute,
+      );
+      if (scheduledTarget.isBefore(now.subtract(const Duration(seconds: 10)))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The selected time is in the past. Please choose a future time or date.'),
+            backgroundColor: AppColors.expense,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _isSaving = true);
     try {
       final provider = context.read<ReminderProvider>();
       // Ask for notification permission if not yet requested
       await provider.requestNotificationPermission();
 
-      final now = DateTime.now();
       if (isEditing) {
         final updated = widget.initialReminder!.copyWith(
           name: name,
@@ -186,6 +231,7 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
           SnackBar(
             content: Text('Failed to save reminder: $e'),
             backgroundColor: AppColors.expense,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -197,19 +243,34 @@ class _AddEditReminderScreenState extends State<AddEditReminderScreen> {
   }
 
   Future<void> _delete() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'Delete reminder?',
-          style: TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+          ),
         ),
-        content: const Text('This will remove this reminder and cancel any scheduled alerts.'),
+        content: Text(
+          'This will remove this reminder and cancel any scheduled alerts.',
+          style: TextStyle(
+            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),

@@ -47,12 +47,12 @@ class AppColors {
   static const Color darkSurface = Color(0xFF131D2E); // Dark surface
   static const Color darkSurfaceCard = Color(0xFF18253A); // Dark card surface
   static const Color darkSurfaceElevated = Color(0xFF1E2D44); // Elevated dark surface
-  static const Color darkBorder = Color(0xFF243550); // Subtle dark border
-  static const Color darkBorderSubtle = Color(0xFF1B283E); // Ultra subtle dark border
-  static const Color darkTextPrimary = Color(0xFFF8FAFC); // Very light / crisp off-white
+  static const Color darkBorder = Color(0xFF283A55); // Subtle dark border
+  static const Color darkBorderSubtle = Color(0xFF1E2E46); // Ultra subtle dark border
+  static const Color darkTextPrimary = Color(0xFFF8FAFC); // Very light / crisp off-white (Slate-50)
   static const Color darkTextSecondary = Color(0xFFCBD5E1); // High-contrast light gray (Slate-300)
-  static const Color darkTextTertiary = Color(0xFF94A3B8); // Medium-light gray (Slate-400)
-  static const Color darkTextMuted = Color(0xFF64748B); // Readable placeholder / muted gray (Slate-500)
+  static const Color darkTextTertiary = Color(0xFFA6B4C9); // Highly readable medium-light gray (~5.8:1 ratio)
+  static const Color darkTextMuted = Color(0xFF8899B0); // Clear, readable muted gray / placeholder (~4.8:1 ratio)
 
   // Category Icon & Account Custom Accent Colors
   static const List<Color> categoryPalette = [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kals_money_manager/core/database/app_database.dart';
 import 'package:kals_money_manager/core/database/database_migrations.dart';
+import 'package:kals_money_manager/core/services/notification_service.dart';
 import 'package:kals_money_manager/features/reminders/data/repositories/reminder_repository.dart';
 import 'package:kals_money_manager/features/reminders/domain/entities/reminder.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -141,6 +142,49 @@ void main() {
       await reminderRepo.deleteReminder('rem_db_test_1');
       final afterDelete = await reminderRepo.getAllReminders();
       expect(afterDelete.isEmpty, true);
+    });
+  });
+
+  group('Reminder Notification Service Logic Tests', () {
+    test('NotificationService.getNotificationId produces deterministic positive 31-bit integer hash', () {
+      const id1 = 'reminder-uuid-abc-123';
+      const id2 = 'reminder-uuid-abc-123';
+      const id3 = 'reminder-uuid-xyz-789';
+
+      final hash1 = NotificationService.getNotificationId(id1);
+      final hash2 = NotificationService.getNotificationId(id2);
+      final hash3 = NotificationService.getNotificationId(id3);
+
+      expect(hash1, hash2);
+      expect(hash1, isPositive);
+      expect(hash1 <= 0x7FFFFFFF, true);
+      expect(hash1 != hash3, true);
+    });
+
+    test('Edit reminder retains same stable ID and produces same deterministic notification ID', () {
+      final now = DateTime.now();
+      final original = Reminder(
+        id: 'stable_rem_id_55',
+        name: 'Electric Bill',
+        frequency: ReminderFrequency.once,
+        date: DateTime(2026, 10, 5),
+        time: const TimeOfDay(hour: 10, minute: 0),
+        isEnabled: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final edited = original.copyWith(
+        time: const TimeOfDay(hour: 10, minute: 30),
+        name: 'Electric Bill (Updated)',
+        updatedAt: DateTime.now(),
+      );
+
+      expect(edited.id, original.id);
+      expect(
+        NotificationService.getNotificationId(edited.id),
+        NotificationService.getNotificationId(original.id),
+      );
     });
   });
 }

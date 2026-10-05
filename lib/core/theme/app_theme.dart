@@ -133,8 +133,26 @@ class AppTheme {
         }),
         dividerColor: AppColors.lightBorder,
       ),
-      timePickerTheme: const TimePickerThemeData(
+      timePickerTheme: TimePickerThemeData(
         backgroundColor: AppColors.lightSurfaceCard,
+        hourMinuteShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.lightBorder),
+        ),
+        hourMinuteColor: AppColors.lightSurfaceElevated,
+        hourMinuteTextColor: AppColors.lightTextPrimary,
+        dayPeriodColor: primaryColor.withValues(alpha: 0.15),
+        dayPeriodTextColor: AppColors.lightTextPrimary,
+        dayPeriodBorderSide: const BorderSide(color: AppColors.lightBorder),
+        dialHandColor: primaryColor,
+        dialBackgroundColor: AppColors.lightSurfaceElevated,
+        dialTextColor: AppColors.lightTextPrimary,
+        entryModeIconColor: primaryColor,
+        helpTextStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.lightTextSecondary,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -398,8 +416,26 @@ class AppTheme {
         }),
         dividerColor: AppColors.darkBorder,
       ),
-      timePickerTheme: const TimePickerThemeData(
+      timePickerTheme: TimePickerThemeData(
         backgroundColor: AppColors.darkSurfaceCard,
+        hourMinuteShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.darkBorder),
+        ),
+        hourMinuteColor: AppColors.darkSurfaceElevated,
+        hourMinuteTextColor: AppColors.darkTextPrimary,
+        dayPeriodColor: primaryLightColor.withValues(alpha: 0.35),
+        dayPeriodTextColor: AppColors.darkTextPrimary,
+        dayPeriodBorderSide: const BorderSide(color: AppColors.darkBorder),
+        dialHandColor: primaryLightColor,
+        dialBackgroundColor: AppColors.darkSurfaceElevated,
+        dialTextColor: AppColors.darkTextPrimary,
+        entryModeIconColor: primaryLightColor,
+        helpTextStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.darkTextSecondary,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

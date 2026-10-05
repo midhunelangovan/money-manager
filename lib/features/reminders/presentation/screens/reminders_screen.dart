@@ -164,7 +164,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   size: 24,
                   color: reminder.isEnabled
                       ? AppColors.primary
-                      : (isDark ? AppColors.darkTextMuted : AppColors.lightTextSecondary),
+                      : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary),
                 ),
               ),
               const SizedBox(width: 14),
@@ -181,7 +181,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         fontWeight: FontWeight.w700,
                         color: reminder.isEnabled
                             ? (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)
-                            : (isDark ? AppColors.darkTextMuted : AppColors.lightTextSecondary),
+                            : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -225,7 +225,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         reminder.comment!,
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? AppColors.darkTextMuted : AppColors.lightTextSecondary,
+                          color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary,
                           fontStyle: FontStyle.italic,
                         ),
                         maxLines: 1,

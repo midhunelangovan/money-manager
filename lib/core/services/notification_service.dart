@@ -464,13 +464,9 @@ class NotificationService {
           await cancelReminder(reminder.id);
         }
       }
-      if (kDebugMode) {
-        debugPrint('[REMINDER_RESCHEDULED] Rescheduled ${reminders.where((r) => r.isEnabled).length} active reminders');
-      }
+      debugPrint('[REMINDER_RESCHEDULED] Rescheduled ${reminders.where((r) => r.isEnabled).length} active reminders');
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('NotificationService: Reschedule all error: $e');
-      }
+      debugPrint('NotificationService: Reschedule all error: $e');
     }
   }
 
@@ -478,32 +474,22 @@ class NotificationService {
     try {
       final id = getNotificationId(reminderId);
       if (isTestMode) {
-        if (kDebugMode) {
-          debugPrint('[REMINDER_CANCELLED] (testMode) id: $reminderId, scheduleId: $id');
-        }
+        debugPrint('[REMINDER_CANCELLED] (testMode) id: $reminderId, scheduleId: $id');
         return;
       }
       await _notificationsPlugin.cancel(id);
-      if (kDebugMode) {
-        debugPrint('[REMINDER_CANCELLED] id: $reminderId, scheduleId: $id');
-      }
+      debugPrint('[REMINDER_CANCELLED] id: $reminderId, scheduleId: $id');
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('NotificationService: Error cancelling reminder: $e');
-      }
+      debugPrint('NotificationService: Error cancelling reminder: $e');
     }
   }
 
   Future<void> cancelAll() async {
     try {
       await _notificationsPlugin.cancelAll();
-      if (kDebugMode) {
-        debugPrint('NotificationService: Cancelled all notifications');
-      }
+      debugPrint('NotificationService: Cancelled all notifications');
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('NotificationService: Error cancelling all notifications: $e');
-      }
+      debugPrint('NotificationService: Error cancelling all notifications: $e');
     }
   }
 }
