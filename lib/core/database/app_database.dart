@@ -105,6 +105,14 @@ class AppDatabase {
             )
           ''');
 
+          // Safely ensure recurring payment reminder columns exist
+          try {
+            await db.execute('ALTER TABLE ${DbTables.recurringTransactions} ADD COLUMN ${DbColumns.remindMe} INTEGER NOT NULL DEFAULT 0');
+          } catch (_) {}
+          try {
+            await db.execute('ALTER TABLE ${DbTables.recurringTransactions} ADD COLUMN ${DbColumns.reminderLeadDays} INTEGER NOT NULL DEFAULT 0');
+          } catch (_) {}
+
           // Reconcile and safely link any legacy unlinked category strings
           await DatabaseMigrations.reconcileLegacyCategories(db);
         },

@@ -14,6 +14,7 @@ class TransactionProvider extends ChangeNotifier {
   TransactionFilter _filter = const TransactionFilter();
   FinancialSummary _monthlySummary = const FinancialSummary.zero();
   FinancialSummary _globalSummary = const FinancialSummary.zero();
+  int _ledgerRevision = 0;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -22,6 +23,7 @@ class TransactionProvider extends ChangeNotifier {
   TransactionFilter get filter => _filter;
   FinancialSummary get monthlySummary => _monthlySummary;
   FinancialSummary get globalSummary => _globalSummary;
+  int get ledgerRevision => _ledgerRevision;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -86,6 +88,7 @@ class TransactionProvider extends ChangeNotifier {
       _errorMessage = 'Unable to load transactions: $e';
     } finally {
       _isLoading = false;
+      _ledgerRevision++;
       notifyListeners();
     }
   }

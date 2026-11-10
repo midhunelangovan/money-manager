@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/navigation/navigation_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/date_formatter.dart';
 import '../../../../core/utilities/id_generator.dart';
 import '../../../../core/utilities/money.dart';
@@ -74,31 +76,23 @@ class _TransferScreenState extends State<TransferScreen> {
 
   Future<void> _saveTransfer() async {
     if (_fromAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a source account.')),
-      );
+      AppSnackBar.showError(context, 'Please select a source account.');
       return;
     }
 
     if (_toAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a destination account.')),
-      );
+      AppSnackBar.showError(context, 'Please select a destination account.');
       return;
     }
 
     if (_fromAccountId == _toAccountId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Source and destination accounts cannot be the same.')),
-      );
+      AppSnackBar.showError(context, 'Source and destination accounts cannot be the same.');
       return;
     }
 
     final parsedAmount = double.tryParse(_amountController.text.trim()) ?? 0.0;
     if (parsedAmount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid transfer amount greater than 0.')),
-      );
+      AppSnackBar.showError(context, 'Please enter a valid transfer amount greater than 0.');
       return;
     }
 
@@ -131,12 +125,16 @@ class _TransferScreenState extends State<TransferScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final rootContext = MainNavigationService.navigatorKey.currentContext;
+          if (rootContext != null && rootContext.mounted) {
+            AppSnackBar.showSuccess(rootContext, 'Transfer completed successfully.');
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving transfer: $e')),
-        );
+        AppSnackBar.showError(context, 'Error saving transfer: $e');
       }
     } finally {
       if (mounted) {

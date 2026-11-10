@@ -404,6 +404,66 @@ class AppCategoryIcons {
       case 'business':
       case 'business_center_rounded':
         return Icons.business_center_rounded;
+      case 'plane':
+      case 'airplane':
+        return Icons.flight_rounded;
+      case 'tag':
+      case 'tags':
+      case 'sell':
+        return Icons.sell_rounded;
+      case 'paw':
+      case 'pets':
+        return Icons.pets_rounded;
+      case 'devices':
+      case 'device':
+        return Icons.devices_rounded;
+      case 'cooking':
+      case 'cook':
+      case 'soup_kitchen':
+        return Icons.soup_kitchen_rounded;
+      case 'paint':
+      case 'paintbrush':
+      case 'brush':
+        return Icons.brush_rounded;
+      case 'laundry':
+      case 'wash':
+      case 'dry_cleaning':
+        return Icons.local_laundry_service_rounded;
+      case 'camping':
+      case 'tent':
+      case 'forest':
+        return Icons.forest_rounded;
+      case 'gaming':
+      case 'game':
+      case 'sports_esports':
+        return Icons.sports_esports_rounded;
+      case 'book':
+      case 'books':
+      case 'menu_book':
+        return Icons.menu_book_rounded;
+      case 'shirt':
+      case 'apparel':
+      case 'checkroom':
+        return Icons.checkroom_rounded;
+      case 'shoe':
+      case 'shoes':
+        return Icons.roller_skating_rounded;
+      case 'split':
+      case 'split_pays':
+      case 'split pays':
+        return Icons.call_split_rounded;
+      case 'repays':
+      case 'repayment':
+      case 'repayments':
+        return Icons.handshake_rounded;
+      case 'family':
+      case 'family contribution':
+        return Icons.family_restroom_rounded;
+      case 'transfers':
+      case 'transfer':
+        return Icons.swap_horiz_rounded;
+      case 'more':
+        return Icons.more_horiz_rounded;
       case 'category':
       case 'category_outlined':
       case 'category_rounded':

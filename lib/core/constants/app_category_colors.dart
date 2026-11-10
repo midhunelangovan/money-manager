@@ -51,7 +51,7 @@ class AppCategoryColors {
         Color(0xFF80D8FF), Color(0xFF40C4FF), Color(0xFF00B0FF), Color(0xFF0091EA),
         Color(0xFF82B1FF), Color(0xFF448AFF), Color(0xFF2979FF), Color(0xFF2962FF),
         Color(0xFF42A5F5), Color(0xFF1E88E5), Color(0xFF1565C0), Color(0xFF0D47A1),
-        Color(0xFF1E3A5F), Color(0xFF2A4D69), Color(0xFF0F2027),
+        Color(0xFF03323A), Color(0xFF2A4D69), Color(0xFF0F2027),
       ],
     ),
     ColorShadeFamily(

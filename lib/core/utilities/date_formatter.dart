@@ -11,6 +11,7 @@ class DateFormatter {
   static String format(DateTime date) => _dayMonthYear.format(date);
   static String formatDate(DateTime date) => _dayMonthYear.format(date);
   static String formatTime(DateTime date) => DateFormat('h:mm a').format(date);
+  static String formatDateAndTime(DateTime date) => '${_dayMonthYear.format(date)}, ${DateFormat('h:mm a').format(date)}';
   static String formatShort(DateTime date) => _dayMonth.format(date);
   static String formatMonthYear(DateTime date) => _monthYear.format(date);
   static String formatFullWithDay(DateTime date) => DateFormat('MMMM d, yyyy (E)').format(date);

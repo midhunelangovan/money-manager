@@ -54,6 +54,8 @@ class DatabaseMigrations {
         ${DbColumns.endDate} INTEGER,
         ${DbColumns.nextExecutionDate} INTEGER NOT NULL,
         ${DbColumns.isActive} INTEGER NOT NULL DEFAULT 1,
+        ${DbColumns.remindMe} INTEGER NOT NULL DEFAULT 0,
+        ${DbColumns.reminderLeadDays} INTEGER NOT NULL DEFAULT 0,
         ${DbColumns.createdAt} INTEGER NOT NULL,
         ${DbColumns.updatedAt} INTEGER NOT NULL,
         FOREIGN KEY (${DbColumns.accountId}) REFERENCES ${DbTables.accounts} (${DbColumns.id}) ON DELETE RESTRICT,

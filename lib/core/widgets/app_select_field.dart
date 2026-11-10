@@ -298,7 +298,7 @@ class _AppSelectModalState<T> extends State<_AppSelectModal<T>> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurfaceElevated : const Color(0xFFF1F5F9),
+                    color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
                     borderRadius: BorderRadius.circular(10),
                     border: isDark ? Border.all(color: AppColors.darkBorderSubtle) : null,
                   ),

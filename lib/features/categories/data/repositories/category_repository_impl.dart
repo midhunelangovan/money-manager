@@ -69,6 +69,9 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   @override
   Future<void> createCategory(Category category) async {
+    if (category.name.trim().isEmpty) {
+      throw ArgumentError('Category name cannot be empty');
+    }
     final db = await appDatabase.database;
     final model = CategoryModel.fromEntity(category);
     await db.insert(
@@ -80,6 +83,9 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   @override
   Future<void> updateCategory(Category category) async {
+    if (category.name.trim().isEmpty) {
+      throw ArgumentError('Category name cannot be empty');
+    }
     final db = await appDatabase.database;
     final model = CategoryModel.fromEntity(category.copyWith(updatedAt: DateTime.now()));
     final count = await db.update(

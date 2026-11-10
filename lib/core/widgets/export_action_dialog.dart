@@ -5,6 +5,7 @@ import '../../features/backup/data/services/excel_export_service.dart';
 import '../../features/backup/presentation/providers/backup_provider.dart';
 import '../extensions/date_extensions.dart';
 import '../theme/app_colors.dart';
+import '../utilities/app_snack_bar.dart';
 import '../utilities/date_formatter.dart';
 import 'export_success_dialog.dart';
 
@@ -184,10 +185,10 @@ class ExportActionDialog {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E2838) : const Color(0xFFF1F5F9),
+                                  color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: isDark ? const Color(0xFF283646) : const Color(0xFFCBD5E1),
+                                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                                   ),
                                 ),
                                 child: Column(
@@ -222,10 +223,10 @@ class ExportActionDialog {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E2838) : const Color(0xFFF1F5F9),
+                                  color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: isDark ? const Color(0xFF283646) : const Color(0xFFCBD5E1),
+                                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                                   ),
                                 ),
                                 child: Column(
@@ -258,7 +259,7 @@ class ExportActionDialog {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      icon: const Icon(Icons.file_download_outlined, size: 20),
+                      icon: const Icon(Icons.file_download_rounded, size: 20),
                       label: const Text(
                         'Export to Excel (.xlsx)',
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
@@ -303,12 +304,12 @@ class ExportActionDialog {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primary
-              : (isDark ? const Color(0xFF1E2838) : const Color(0xFFF1F5F9)),
+              : (isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
                 ? AppColors.primary
-                : (isDark ? const Color(0xFF283646) : const Color(0xFFE2E8F0)),
+                : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
           ),
         ),
         child: Text(
@@ -330,14 +331,8 @@ class ExportActionDialog {
     required ExcelExportFilter filter,
   }) async {
     final backupProvider = context.read<BackupProvider>();
-    final messenger = ScaffoldMessenger.of(context);
 
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text('Generating Excel export...'),
-        duration: Duration(seconds: 1),
-      ),
-    );
+    AppSnackBar.showInfo(context, 'Generating Excel export...');
 
     try {
       final File? file = await backupProvider.exportToExcel(filter: filter);
@@ -348,21 +343,11 @@ class ExportActionDialog {
           type: ExportFileType.excel,
         );
       } else if (context.mounted) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Export failed: file could not be generated. Please try again.'),
-            backgroundColor: AppColors.expense,
-          ),
-        );
+        AppSnackBar.showError(context, 'Export failed: file could not be generated. Please try again.');
       }
     } catch (e) {
       if (context.mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Export error: $e'),
-            backgroundColor: AppColors.expense,
-          ),
-        );
+        AppSnackBar.showError(context, 'Export error: $e');
       }
     }
   }

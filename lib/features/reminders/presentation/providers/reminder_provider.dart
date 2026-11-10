@@ -44,22 +44,31 @@ class ReminderProvider extends ChangeNotifier {
     return await _notificationService.requestPermissions();
   }
 
-  Future<void> showTestNotification() async {
-    await _notificationService.showTestNotification();
-  }
+  NotificationService get notificationService => _notificationService;
+  String? _schedulingWarning;
+  String? get schedulingWarning => _schedulingWarning;
 
   Future<void> addReminder(Reminder reminder) async {
+    _schedulingWarning = null;
     try {
-      final scheduleId = NotificationService.getNotificationId(reminder.id);
-      debugPrint('[REMINDER_CREATED] id: ${reminder.id}, scheduleId: $scheduleId, name: "${reminder.name}", freq: ${reminder.frequency.name}, date: ${reminder.date.toIso8601String()}, time: ${reminder.time.hour}:${reminder.time.minute}');
-      
       // Step 1: Insert into database
       await _repository.insertReminder(reminder);
-      debugPrint('[REMINDER_PERSISTED] id: ${reminder.id}');
       
-      // Step 2: Schedule in AlarmManager if enabled
+      // Step 2: Schedule in notification system if enabled
       if (reminder.isEnabled) {
-        await _notificationService.scheduleReminder(reminder);
+        try {
+          await _notificationService.scheduleReminder(reminder);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('ReminderProvider: Scheduling error for ${reminder.id}: $e');
+          }
+          final errStr = e.toString().toLowerCase();
+          if (errStr.contains('permission') || errStr.contains('exact_alarm')) {
+            _schedulingWarning = 'Saved, but notification permission is required for alerts.';
+          } else {
+            _schedulingWarning = 'Saved, but notifications could not be scheduled on this device.';
+          }
+        }
       }
       
       // Step 3: Refresh in-memory list from DB
@@ -73,20 +82,29 @@ class ReminderProvider extends ChangeNotifier {
   }
 
   Future<void> updateReminder(Reminder reminder) async {
+    _schedulingWarning = null;
     try {
-      final scheduleId = NotificationService.getNotificationId(reminder.id);
-      debugPrint('[REMINDER_UPDATE_REQUESTED] id: ${reminder.id}, scheduleId: $scheduleId, name: "${reminder.name}", freq: ${reminder.frequency.name}, enabled: ${reminder.isEnabled}, date: ${reminder.date.toIso8601String()}, time: ${reminder.time.hour}:${reminder.time.minute}');
-      
       // Step 1: Explicitly cancel existing notification/alarm for this reminder
       await _notificationService.cancelReminder(reminder.id);
       
       // Step 2: Persist updated reminder in database
       await _repository.updateReminder(reminder);
-      debugPrint('[REMINDER_PERSISTED] id: ${reminder.id}');
       
       // Step 3: Schedule the new trigger time if enabled using standard schedule pipeline
       if (reminder.isEnabled) {
-        await _notificationService.scheduleReminder(reminder);
+        try {
+          await _notificationService.scheduleReminder(reminder);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('ReminderProvider: Scheduling error for ${reminder.id}: $e');
+          }
+          final errStr = e.toString().toLowerCase();
+          if (errStr.contains('permission') || errStr.contains('exact_alarm')) {
+            _schedulingWarning = 'Saved, but notification permission is required for alerts.';
+          } else {
+            _schedulingWarning = 'Saved, but notifications could not be scheduled on this device.';
+          }
+        }
       }
       
       // Step 4: Refresh in-memory list from DB
@@ -99,18 +117,33 @@ class ReminderProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> retryRescheduleReminders() async {
+    _isLoading = true;
+    _schedulingWarning = null;
+    notifyListeners();
+    try {
+      _reminders = await _repository.getAllReminders();
+      await _notificationService.rescheduleAllActiveReminders(_reminders);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('ReminderProvider: Retry rescheduling error: $e');
+      }
+      _schedulingWarning = 'Could not reschedule all reminders. Check system permissions.';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> toggleReminder(Reminder reminder) async {
     try {
       final updated = reminder.copyWith(
         isEnabled: !reminder.isEnabled,
         updatedAt: DateTime.now(),
       );
-      final scheduleId = NotificationService.getNotificationId(updated.id);
-      debugPrint('[REMINDER_TOGGLED] id: ${updated.id}, scheduleId: $scheduleId, isEnabled: ${updated.isEnabled}');
       
       // Step 1: Update in database
       await _repository.updateReminder(updated);
-      debugPrint('[REMINDER_PERSISTED] id: ${updated.id}');
       
       // Step 2: Schedule or Cancel in AlarmManager
       if (updated.isEnabled) {
@@ -130,9 +163,6 @@ class ReminderProvider extends ChangeNotifier {
 
   Future<void> deleteReminder(String id) async {
     try {
-      final scheduleId = NotificationService.getNotificationId(id);
-      debugPrint('[REMINDER_DELETED] id: $id, scheduleId: $scheduleId');
-      
       // Step 1: Cancel notification/alarm
       await _notificationService.cancelReminder(id);
       

@@ -120,6 +120,9 @@ class AccountRepositoryImpl implements AccountRepository {
 
   @override
   Future<void> createAccount(Account account) async {
+    if (account.name.trim().isEmpty) {
+      throw ArgumentError('Account name cannot be empty');
+    }
     final db = await appDatabase.database;
     final model = AccountModel.fromEntity(account);
     await db.insert(
@@ -131,6 +134,9 @@ class AccountRepositoryImpl implements AccountRepository {
 
   @override
   Future<void> updateAccount(Account account) async {
+    if (account.name.trim().isEmpty) {
+      throw ArgumentError('Account name cannot be empty');
+    }
     final db = await appDatabase.database;
     final model = AccountModel.fromEntity(account.copyWith(updatedAt: DateTime.now()));
     final count = await db.update(

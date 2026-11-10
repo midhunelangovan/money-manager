@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/widgets/profile_avatar.dart';
 import '../providers/settings_provider.dart';
 
 class PersonalizationSettingsScreen extends StatefulWidget {
@@ -39,18 +41,14 @@ class _PersonalizationSettingsScreenState extends State<PersonalizationSettingsS
     if (mounted) {
       setState(() => _isSaving = false);
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Display name updated successfully'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppSnackBar.showSuccess(context, 'Profile updated successfully');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final settings = context.watch<SettingsProvider>();
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
@@ -58,7 +56,7 @@ class _PersonalizationSettingsScreenState extends State<PersonalizationSettingsS
         child: Column(
           children: [
             const AppHeader(
-              title: 'Personalization',
+              title: 'Profile & Identity',
               showBackButton: true,
             ),
             Expanded(
@@ -67,6 +65,33 @@ class _PersonalizationSettingsScreenState extends State<PersonalizationSettingsS
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Profile Initials Banner
+                    AppCard(
+                      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                      child: Column(
+                        children: [
+                          Center(
+                            child: ProfileAvatar(
+                              name: settings.profileName,
+                              size: 72,
+                              fontSize: 26,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            settings.profileName,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
                     AppCard(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -75,7 +100,7 @@ class _PersonalizationSettingsScreenState extends State<PersonalizationSettingsS
                           Text(
                             'Personal Information',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.w700,
                               color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                             ),
@@ -84,7 +109,7 @@ class _PersonalizationSettingsScreenState extends State<PersonalizationSettingsS
                           Text(
                             'Your display name appears on the dashboard greeting and exported financial summaries.',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12.5,
                               color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                               height: 1.4,
                             ),
@@ -122,7 +147,7 @@ class _PersonalizationSettingsScreenState extends State<PersonalizationSettingsS
                             : const Text(
                                 'Save Changes',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),

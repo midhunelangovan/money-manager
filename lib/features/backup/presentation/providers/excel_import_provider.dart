@@ -163,7 +163,7 @@ class ExcelImportProvider extends ChangeNotifier {
         sheetNames: _selectedSheetNames.toList(),
       );
       _accountMappings = Map.from(_analysis!.accountMappings);
-      _categoryMappings = Map.from(_analysis!.categoryMappings);
+      _categoryMappings = CategoryMappingLookupMap(Map.from(_analysis!.categoryMappings));
 
       // Move to Account Mapping step
       _currentStep = ImportWizardStep.accountMapping;
@@ -194,14 +194,35 @@ class ExcelImportProvider extends ChangeNotifier {
 
   void updateCategoryMapping({
     required String legacyName,
+    CategoryType? categoryType,
     String? targetCategoryId,
     String? targetCategoryName,
     required MappingStatus status,
   }) {
-    final current = _categoryMappings[legacyName];
-    if (current == null) return;
+    String? foundKey;
+    if (categoryType != null) {
+      final compositeKey = '$legacyName|${categoryType.name}';
+      if (_categoryMappings.containsKey(compositeKey)) {
+        foundKey = compositeKey;
+      }
+    }
+    if (foundKey == null) {
+      if (_categoryMappings.containsKey(legacyName)) {
+        foundKey = legacyName;
+      } else {
+        foundKey = _categoryMappings.keys.where((k) {
+          final e = _categoryMappings[k]!;
+          if (categoryType != null) {
+            return e.legacyName == legacyName && e.categoryType == categoryType;
+          }
+          return e.legacyName == legacyName;
+        }).firstOrNull;
+      }
+    }
 
-    _categoryMappings[legacyName] = current.copyWith(
+    if (foundKey == null) return;
+    final current = _categoryMappings[foundKey]!;
+    _categoryMappings[foundKey] = current.copyWith(
       targetCategoryId: targetCategoryId,
       targetCategoryName: targetCategoryName,
       status: status,
@@ -350,6 +371,7 @@ class ExcelImportProvider extends ChangeNotifier {
 
     updateCategoryMapping(
       legacyName: legacyName,
+      categoryType: categoryType,
       targetCategoryId: newId,
       targetCategoryName: categoryName.trim(),
       status: MappingStatus.exactMatch,

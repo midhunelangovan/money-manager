@@ -114,7 +114,7 @@ class TransactionAttachment extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    Icons.photo_camera_outlined,
+                    Icons.photo_camera_rounded,
                     size: 18,
                     color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                   ),
@@ -163,7 +163,7 @@ class TransactionAttachment extends StatelessWidget {
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_a_photo_outlined, size: 18, color: AppColors.primaryLight),
+                    Icon(Icons.add_a_photo_rounded, size: 18, color: AppColors.primaryLight),
                     SizedBox(width: 8),
                     Text(
                       '+ Add Photo / Receipt',
@@ -196,7 +196,7 @@ class TransactionAttachment extends StatelessWidget {
                           }
                           return Container(
                             color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
-                            child: const Icon(Icons.image_outlined, size: 26, color: AppColors.lightTextMuted),
+                            child: const Icon(Icons.image_rounded, size: 26, color: AppColors.lightTextMuted),
                           );
                         },
                       ),

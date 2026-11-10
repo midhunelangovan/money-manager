@@ -13,6 +13,7 @@ class AccountProvider extends ChangeNotifier {
   String? _errorMessage;
 
   List<AccountWithBalance> get accountsWithBalances => _accountsWithBalances;
+  List<Account> get accounts => _accountsWithBalances.map((a) => a.account).toList();
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 

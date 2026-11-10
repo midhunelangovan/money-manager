@@ -279,8 +279,9 @@ void main() {
 
     test('5. Onboarding State Detection: Fresh Install shows Onboarding, Existing User Skips', () async {
       // 1. Fresh empty database instance
+      final freshDbName = 'fresh_onboarding_${DateTime.now().microsecondsSinceEpoch}.db';
       final freshDb = await openDatabase(
-        inMemoryDatabasePath,
+        freshDbName,
         version: 1,
         onConfigure: (d) async => await d.execute('PRAGMA foreign_keys = ON'),
         onCreate: DatabaseMigrations.onCreate,
@@ -305,6 +306,7 @@ void main() {
       expect(reloadedSettings.isOnboardingCompleted, isTrue);
 
       await freshDb.close();
+      await databaseFactory.deleteDatabase(freshDbName);
     });
   });
 }

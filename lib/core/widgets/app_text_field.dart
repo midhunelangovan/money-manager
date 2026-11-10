@@ -60,9 +60,9 @@ class AppTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final defaultBg = isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard;
+    final defaultBg = isDark ? AppColors.darkInputSurface : AppColors.lightInputSurface;
     final defaultBorder = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final primaryColor = isDark ? AppColors.darkPrimary : Theme.of(context).colorScheme.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

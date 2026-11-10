@@ -86,7 +86,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           fontSize: 12,
                           color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -163,7 +163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Divider(height: 1, indent: 76, endIndent: 16, color: isDark ? AppColors.darkBorderSubtle : null),
                         _buildSettingsRow(
                           context: context,
-                          icon: Icons.palette_outlined,
+                          icon: Icons.palette_rounded,
                           title: 'Appearance',
                           subtitle: settings.themeMode == ThemeMode.light
                               ? 'Light Theme'
@@ -180,7 +180,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Divider(height: 1, indent: 76, endIndent: 16, color: isDark ? AppColors.darkBorderSubtle : null),
                         _buildSettingsRow(
                           context: context,
-                          icon: Icons.account_balance_wallet_outlined,
+                          icon: Icons.account_balance_wallet_rounded,
                           title: 'Currency & Accounts',
                           subtitle: '${settings.currencyCode} (${settings.currencySymbol}) • Default account preferences',
                           onTap: () {
@@ -193,7 +193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Divider(height: 1, indent: 76, endIndent: 16, color: isDark ? AppColors.darkBorderSubtle : null),
                         _buildSettingsRow(
                           context: context,
-                          icon: Icons.category_outlined,
+                          icon: Icons.category_rounded,
                           title: 'Categories',
                           subtitle: 'Manage flat expense and income categories',
                           onTap: () {
@@ -206,7 +206,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Divider(height: 1, indent: 76, endIndent: 16, color: isDark ? AppColors.darkBorderSubtle : null),
                         _buildSettingsRow(
                           context: context,
-                          icon: Icons.folder_open_outlined,
+                          icon: Icons.folder_open_rounded,
                           title: 'Data & Storage',
                           subtitle: 'Backup, restore, and Excel spreadsheet export',
                           onTap: () {

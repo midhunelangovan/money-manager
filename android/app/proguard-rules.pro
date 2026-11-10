@@ -21,3 +21,14 @@
 
 # Keep Lifecycle observer for Flutter plugins
 -keep class androidx.lifecycle.DefaultLifecycleObserver
+
+# Retain R class and drawable identifiers for dynamic runtime lookups
+-keepclassmembers class **.R$drawable {
+    public static final int ic_notification;
+}
+-keepclassmembers class **.R$* {
+    public static <fields>;
+}
+-keep class **.R$* {
+    *;
+}

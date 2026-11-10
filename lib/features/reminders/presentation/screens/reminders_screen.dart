@@ -16,12 +16,58 @@ class RemindersScreen extends StatefulWidget {
 }
 
 class _RemindersScreenState extends State<RemindersScreen> {
+  static const List<String> _weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
+  static const List<String> _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  bool _notificationsEnabled = true;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ReminderProvider>().loadReminders();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<ReminderProvider>();
+      await provider.loadReminders();
+      final enabled = await provider.notificationService.areNotificationsEnabled();
+      if (mounted) {
+        setState(() => _notificationsEnabled = enabled);
+      }
     });
+  }
+
+  String _formatOrdinal(int n) {
+    if (n >= 11 && n <= 13) return '${n}th';
+    switch (n % 10) {
+      case 1:
+        return '${n}st';
+      case 2:
+        return '${n}nd';
+      case 3:
+        return '${n}rd';
+      default:
+        return '${n}th';
+    }
   }
 
   String _formatReminderSchedule(Reminder reminder) {
@@ -33,11 +79,41 @@ class _RemindersScreenState extends State<RemindersScreen> {
       reminder.time.minute,
     ));
 
-    final relativeDate = DateFormatter.formatRelative(reminder.date);
-    if (reminder.frequency == ReminderFrequency.once) {
-      return '$relativeDate • $timeStr';
-    } else {
-      return '${reminder.frequency.displayName} • $timeStr';
+    switch (reminder.frequency) {
+      case ReminderFrequency.daily:
+        return 'Every day • $timeStr';
+      case ReminderFrequency.weekly:
+        final weekdayName = _weekdays[(reminder.date.weekday - 1).clamp(0, 6)];
+        return 'Every $weekdayName • $timeStr';
+      case ReminderFrequency.monthly:
+        final ordinal = _formatOrdinal(reminder.date.day);
+        return 'Every $ordinal of the month • $timeStr';
+      case ReminderFrequency.yearly:
+        final monthName = _months[(reminder.date.month - 1).clamp(0, 11)];
+        final ordinal = _formatOrdinal(reminder.date.day);
+        return 'Every $monthName $ordinal • $timeStr';
+      case ReminderFrequency.once:
+        final relativeDate = DateFormatter.formatRelative(reminder.date);
+        return '$relativeDate • $timeStr';
+      case ReminderFrequency.custom:
+        return 'Custom • $timeStr';
+    }
+  }
+
+  IconData _getFrequencyIcon(ReminderFrequency frequency) {
+    switch (frequency) {
+      case ReminderFrequency.daily:
+        return Icons.repeat_rounded;
+      case ReminderFrequency.weekly:
+        return Icons.event_repeat_rounded;
+      case ReminderFrequency.monthly:
+        return Icons.calendar_month_rounded;
+      case ReminderFrequency.yearly:
+        return Icons.calendar_today_rounded;
+      case ReminderFrequency.custom:
+        return Icons.tune_rounded;
+      case ReminderFrequency.once:
+        return Icons.notifications_active_rounded;
     }
   }
 
@@ -57,7 +133,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
+  Widget _buildEmptyState(bool isDark, Color primaryColor) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -68,13 +144,13 @@ class _RemindersScreenState extends State<RemindersScreen> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: AppColors.primaryContainer.withValues(alpha: isDark ? 0.2 : 0.5),
+                color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.notifications_none_rounded,
                 size: 36,
-                color: AppColors.primary,
+                color: primaryColor,
               ),
             ),
             const SizedBox(height: 20),
@@ -99,8 +175,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: primaryColor,
+                foregroundColor: isDark ? AppColors.darkBackground : Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -114,31 +190,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
               ),
             ),
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                await context.read<ReminderProvider>().showTestNotification();
-                if (mounted) {
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Test notification sent! Check your notification bar.'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.notifications_active_outlined, size: 18),
-              label: const Text('Send Test Notification'),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildReminderItem(Reminder reminder, bool isDark) {
+  Widget _buildReminderItem(Reminder reminder, bool isDark, Color primaryColor) {
     final scheduleText = _formatReminderSchedule(reminder);
+    final frequencyIcon = _getFrequencyIcon(reminder.frequency);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -155,15 +215,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 height: 44,
                 decoration: BoxDecoration(
                   color: reminder.isEnabled
-                      ? AppColors.primaryContainer.withValues(alpha: isDark ? 0.3 : 0.6)
+                      ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.12)
                       : (isDark ? AppColors.darkBorderSubtle : AppColors.lightBorder.withValues(alpha: 0.5)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  reminder.isEnabled ? Icons.alarm_rounded : Icons.alarm_off_rounded,
-                  size: 24,
+                  reminder.isEnabled ? frequencyIcon : Icons.notifications_off_rounded,
+                  size: 22,
                   color: reminder.isEnabled
-                      ? AppColors.primary
+                      ? primaryColor
                       : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary),
                 ),
               ),
@@ -192,16 +252,34 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.08),
+                            color: reminder.isEnabled
+                                ? primaryColor.withValues(alpha: isDark ? 0.2 : 0.08)
+                                : (isDark ? AppColors.darkBorderSubtle : AppColors.lightBorder.withValues(alpha: 0.5)),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'REMINDER',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                reminder.isEnabled ? frequencyIcon : Icons.alarm_off_rounded,
+                                size: 11,
+                                color: reminder.isEnabled
+                                    ? primaryColor
+                                    : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                reminder.frequency.shortName.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: reminder.isEnabled
+                                      ? primaryColor
+                                      : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextSecondary),
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -242,7 +320,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 scale: 0.85,
                 child: Switch.adaptive(
                   value: reminder.isEnabled,
-                  activeThumbColor: AppColors.primary,
+                  activeThumbColor: primaryColor,
                   onChanged: (val) {
                     context.read<ReminderProvider>().toggleReminder(reminder);
                   },
@@ -258,12 +336,13 @@ class _RemindersScreenState extends State<RemindersScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: primaryColor,
+        foregroundColor: isDark ? AppColors.darkBackground : Colors.white,
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         onPressed: _openAddReminder,
@@ -281,48 +360,87 @@ class _RemindersScreenState extends State<RemindersScreen> {
               showBackButton: true,
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_active_outlined, color: Colors.white),
-                  tooltip: 'Test Notification',
-                  onPressed: () async {
-                    final messenger = ScaffoldMessenger.of(context);
-                    await context.read<ReminderProvider>().showTestNotification();
-                    if (mounted) {
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('Test notification sent! Check your notification shade.'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  },
-                ),
-                IconButton(
                   icon: const Icon(Icons.add_rounded, color: Colors.white),
                   tooltip: 'Create Reminder',
                   onPressed: _openAddReminder,
                 ),
               ],
             ),
+            if (!_notificationsEnabled)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade900.withValues(alpha: isDark ? 0.25 : 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.amber.shade800.withValues(alpha: isDark ? 0.4 : 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_off_rounded,
+                      color: Colors.amber.shade800,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Notifications are disabled. Reminders will not appear until allowed in system settings.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () async {
+                        final provider = context.read<ReminderProvider>();
+                        final granted = await provider.requestNotificationPermission();
+                        if (mounted) {
+                          setState(() => _notificationsEnabled = granted);
+                        }
+                      },
+                      child: Text(
+                        'Enable',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: isDark ? Colors.amber.shade300 : Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: Consumer<ReminderProvider>(
                 builder: (context, provider, child) {
                   if (provider.isLoading && provider.reminders.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(child: CircularProgressIndicator(color: primaryColor));
                   }
 
                   if (provider.reminders.isEmpty) {
-                    return _buildEmptyState(isDark);
+                    return _buildEmptyState(isDark, primaryColor);
                   }
 
                   return RefreshIndicator(
                     onRefresh: () => provider.loadReminders(),
-                    color: AppColors.primary,
+                    color: primaryColor,
                     child: ListView.builder(
                       padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
                       itemCount: provider.reminders.length,
                       itemBuilder: (context, index) {
                         final reminder = provider.reminders[index];
-                        return _buildReminderItem(reminder, isDark);
+                        return _buildReminderItem(reminder, isDark, primaryColor);
                       },
                     ),
                   );

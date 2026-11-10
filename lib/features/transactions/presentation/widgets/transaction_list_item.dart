@@ -4,6 +4,7 @@ import '../../../../core/constants/app_category_icons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utilities/date_formatter.dart';
+import '../../../../core/widgets/app_category_icon.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/widgets/photo_preview_dialog.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
@@ -57,65 +58,82 @@ class TransactionListItem extends StatelessWidget {
     final formattedAmount = item.amount.format(currency: settings.currency);
     final hasAttachment = item.receiptPath != null && item.receiptPath!.isNotEmpty;
 
-    return Dismissible(
-      key: Key(item.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (direction) async {
-        final confirmed = await TransactionDeleteConfirmationDialog.show(
-          context,
-          amount: item.amount,
-          accountName: item.accountName ?? 'Account',
-          categoryName: item.categoryName ?? item.itemType.displayName,
-          date: item.date,
-          description: item.description,
-        );
-        if (confirmed == true && onDelete != null) {
-          onDelete!();
-        }
-        return confirmed;
-      },
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: AppColors.expense,
-          borderRadius: BorderRadius.circular(16),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          width: 1,
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.white, size: 26),
       ),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            width: 1,
-          ),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: () async {
+          final action = await showModalBottomSheet<String>(
+            context: context,
+            backgroundColor: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (ctx) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  if (onTap != null)
+                    ListTile(
+                      leading: const Icon(Icons.edit_rounded),
+                      title: const Text('Edit Transaction'),
+                      onTap: () => Navigator.pop(ctx, 'edit'),
+                    ),
+                  if (onDelete != null)
+                    ListTile(
+                      leading: const Icon(Icons.delete_outline_rounded, color: AppColors.expense),
+                      title: const Text('Delete Transaction', style: TextStyle(color: AppColors.expense)),
+                      onTap: () => Navigator.pop(ctx, 'delete'),
+                    ),
+                ],
+              ),
+            ),
+          );
+
+          if (action == 'edit' && onTap != null) {
+            onTap?.call();
+          } else if (action == 'delete' && onDelete != null && context.mounted) {
+            final confirmed = await TransactionDeleteConfirmationDialog.show(
+              context,
+              amount: item.amount,
+              accountName: item.accountName ?? 'Account',
+              categoryName: item.categoryName ?? item.itemType.displayName,
+              date: item.date,
+              description: item.description,
+            );
+            if (confirmed == true && onDelete != null) {
+              onDelete!();
+            }
+          }
+        },
+        borderRadius: BorderRadius.circular(14),
           child: Row(
             children: [
-              // Circular Category Icon (48×48 container, 26dp icon)
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: categoryColor.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: categoryColor.withValues(alpha: 0.28),
-                    width: 1,
-                  ),
-                ),
-                child: Icon(
-                  itemIcon,
-                  color: categoryColor,
-                  size: 26,
-                ),
+              // Category Icon (consistent bold outline, 26dp icon)
+              AppCategoryIcon(
+                icon: itemIcon,
+                color: categoryColor,
+                size: 44,
+                iconSize: 26,
+                borderRadius: BorderRadius.circular(12),
               ),
               const SizedBox(width: 12),
 
@@ -141,10 +159,10 @@ class TransactionListItem extends StatelessWidget {
                         ),
                         if (item.isRecurring) ...[
                           const SizedBox(width: 6),
-                          const Icon(
+                          Icon(
                             Icons.repeat_rounded,
                             size: 14,
-                            color: AppColors.primaryLight,
+                            color: isDark ? Theme.of(context).colorScheme.primary : AppColors.primaryLight,
                           ),
                         ],
                         if (hasAttachment) ...[
@@ -158,20 +176,20 @@ class TransactionListItem extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.12),
+                                color: (isDark ? Theme.of(context).colorScheme.primary : AppColors.primary).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.photo_outlined, size: 12, color: AppColors.primary),
-                                  SizedBox(width: 2),
+                                  Icon(Icons.photo_rounded, size: 12, color: isDark ? Theme.of(context).colorScheme.primary : AppColors.primary),
+                                  const SizedBox(width: 2),
                                   Text(
                                     'Photo',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
+                                      color: isDark ? Theme.of(context).colorScheme.primary : AppColors.primary,
                                     ),
                                   ),
                                 ],
@@ -271,7 +289,6 @@ class TransactionListItem extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }

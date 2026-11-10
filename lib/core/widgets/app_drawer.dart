@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../navigation/navigation_service.dart';
-import '../../features/accounts/presentation/providers/account_provider.dart';
-import '../../features/backup/presentation/screens/integrity_screen.dart';
 import '../../features/categories/presentation/screens/categories_screen.dart';
 import '../../features/recurring/presentation/screens/recurring_screen.dart';
 import '../../features/reminders/presentation/screens/reminders_screen.dart';
 import '../../features/settings/presentation/providers/settings_provider.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../constants/app_constants.dart';
+import '../navigation/navigation_service.dart';
 import '../theme/app_colors.dart';
-import '../utilities/money.dart';
+import 'profile_avatar.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -18,91 +16,67 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final accountProvider = context.watch<AccountProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final activeTab = MainNavigationService.currentTabNotifier.value;
 
-    final totalBalanceFormatted = Money.fromUnits(accountProvider.totalBalance.units).format(currency: settings.currency);
-    final now = DateTime.now();
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final timeFormatted = '${now.day} ${months[now.month - 1]} ${now.year} · ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final drawerBg = isDark ? AppColors.darkSurface : theme.colorScheme.primary;
+    final drawerBg = AppColors.surface(isDark);
+    final textPrimary = AppColors.textPrimary(isDark);
+    final textSecondary = AppColors.textSecondary(isDark);
+    final selectedBg = isDark
+        ? primaryColor.withValues(alpha: 0.22)
+        : primaryColor.withValues(alpha: 0.12);
+    final selectedTextColor = isDark ? primaryColor : primaryColor;
 
     return Drawer(
       backgroundColor: drawerBg,
       child: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. Profile & Balance Header
+            // 1. Compact Header: Initials Avatar + Saved Display Name
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.15),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 2),
-                        ),
-                        child: const Icon(
-                          Icons.person_rounded,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              settings.profileName.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Balance: $totalBalanceFormatted',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.9),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  ProfileAvatar(
+                    name: settings.profileName,
+                    size: 44,
+                    fontSize: 16.5,
                   ),
-                  const SizedBox(height: 16),
-                  Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      settings.profileName,
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ),
+            Divider(color: AppColors.divider(isDark), height: 1),
 
-            // 2. Navigation Menu Items
+            // 2. Navigation Menu Items (Direct, Uncluttered, Reference-Inspired)
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 children: [
                   _buildMenuItem(
                     context,
-                    icon: Icons.home_outlined,
+                    icon: Icons.dashboard_rounded,
                     label: 'Home',
+                    isSelected: activeTab == 0,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       MainNavigationService.navigateToTab(context, 0);
@@ -110,8 +84,13 @@ class AppDrawer extends StatelessWidget {
                   ),
                   _buildMenuItem(
                     context,
-                    icon: Icons.receipt_long_outlined,
+                    icon: Icons.receipt_long_rounded,
                     label: 'Transactions',
+                    isSelected: activeTab == 1,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       MainNavigationService.navigateToTab(context, 1);
@@ -119,8 +98,13 @@ class AppDrawer extends StatelessWidget {
                   ),
                   _buildMenuItem(
                     context,
-                    icon: Icons.account_balance_outlined,
+                    icon: Icons.account_balance_rounded,
                     label: 'Accounts',
+                    isSelected: activeTab == 2,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       MainNavigationService.navigateToTab(context, 2);
@@ -128,8 +112,13 @@ class AppDrawer extends StatelessWidget {
                   ),
                   _buildMenuItem(
                     context,
-                    icon: Icons.pie_chart_outline_rounded,
-                    label: 'Charts',
+                    icon: Icons.insert_chart_rounded,
+                    label: 'Reports',
+                    isSelected: activeTab == 3,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       MainNavigationService.navigateToTab(context, 3);
@@ -137,8 +126,13 @@ class AppDrawer extends StatelessWidget {
                   ),
                   _buildMenuItem(
                     context,
-                    icon: Icons.category_outlined,
+                    icon: Icons.category_rounded,
                     label: 'Categories',
+                    isSelected: false,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
@@ -150,6 +144,11 @@ class AppDrawer extends StatelessWidget {
                     context,
                     icon: Icons.repeat_rounded,
                     label: 'Recurring Payments',
+                    isSelected: false,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
@@ -159,8 +158,13 @@ class AppDrawer extends StatelessWidget {
                   ),
                   _buildMenuItem(
                     context,
-                    icon: Icons.notifications_none_rounded,
+                    icon: Icons.notifications_rounded,
                     label: 'Reminders',
+                    isSelected: false,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
@@ -170,19 +174,13 @@ class AppDrawer extends StatelessWidget {
                   ),
                   _buildMenuItem(
                     context,
-                    icon: Icons.backup_rounded,
-                    label: 'Backup & Restore',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const IntegrityScreen()),
-                      );
-                    },
-                  ),
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.settings_outlined,
+                    icon: Icons.settings_rounded,
                     label: 'Settings',
+                    isSelected: false,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
@@ -192,50 +190,17 @@ class AppDrawer extends StatelessWidget {
                   ),
                   _buildMenuItem(
                     context,
-                    icon: Icons.info_outline_rounded,
+                    icon: Icons.info_rounded,
                     label: 'About',
+                    isSelected: false,
+                    selectedBg: selectedBg,
+                    selectedTextColor: selectedTextColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                     onTap: () {
                       Navigator.pop(context);
                       _showAboutDialog(context);
                     },
-                  ),
-                ],
-              ),
-            ),
-
-            // 3. Drawer Footer: Offline Local Storage Status
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle_outline_rounded, color: Colors.white70, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Data saved locally',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 24),
-                    child: Text(
-                      timeFormatted,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -250,29 +215,52 @@ class AppDrawer extends StatelessWidget {
     BuildContext context, {
     required IconData icon,
     required String label,
+    required bool isSelected,
+    required Color selectedBg,
+    required Color selectedTextColor,
+    required Color textPrimary,
+    required Color textSecondary,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white, size: 22),
-      title: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14.5,
-          fontWeight: FontWeight.w600,
-        ),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        color: isSelected ? selectedBg : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      visualDensity: const VisualDensity(vertical: -1),
-      onTap: onTap,
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: isSelected ? selectedTextColor : textSecondary,
+          size: 22,
+        ),
+        title: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? selectedTextColor : textPrimary,
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        minLeadingWidth: 28,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        visualDensity: const VisualDensity(horizontal: -2, vertical: -1.5),
+        onTap: onTap,
+      ),
     );
   }
 
   void _showAboutDialog(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurfaceCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -281,25 +269,48 @@ class AppDrawer extends StatelessWidget {
               child: Image.asset('assets/icons/app_icon.png', width: 36, height: 36),
             ),
             const SizedBox(width: 12),
-            const Text(AppConstants.appName),
+            Text(
+              AppConstants.appName,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+              ),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version ${AppConstants.appVersion}', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              'Version ${AppConstants.appVersion}',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Database Schema v${AppConstants.databaseVersion} (SQLite Offline)'),
+            Text(
+              'Database Schema v${AppConstants.databaseVersion} (SQLite Offline)',
+              style: TextStyle(
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              ),
+            ),
             const SizedBox(height: 12),
             Text(
               '100% Offline Personal Finance Ledger. No tracking, no cloud servers, strict financial auditability.',
-              style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );

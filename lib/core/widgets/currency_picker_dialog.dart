@@ -83,7 +83,7 @@ class _CurrencyPickerDialogState extends State<CurrencyPickerDialog> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -122,7 +122,7 @@ class _CurrencyPickerDialogState extends State<CurrencyPickerDialog> {
                         border: Border.all(
                           color: isSelected
                               ? AppColors.primary
-                              : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+                              : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
                           width: isSelected ? 1.5 : 1,
                         ),
                       ),

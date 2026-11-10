@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../../core/constants/app_currency.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/database/tables.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/period_selector.dart';
 import '../../../../core/widgets/transaction_type_tabs.dart';
@@ -32,6 +33,7 @@ class SettingsProvider extends ChangeNotifier {
   LedgerTabType _defaultTransactionType = LedgerTabType.expenses;
 
   final AppDatabase? _appDatabase;
+  Future<void>? _loadFuture;
 
   SettingsProvider({AppDatabase? database}) : _appDatabase = database {
     loadSettings();
@@ -56,7 +58,14 @@ class SettingsProvider extends ChangeNotifier {
 
   AppDatabase get _db => _appDatabase ?? AppDatabase.instance;
 
-  Future<void> loadSettings() async {
+  Future<void> loadSettings({bool force = false}) {
+    if (force || _loadFuture == null) {
+      _loadFuture = _performLoadSettings();
+    }
+    return _loadFuture!;
+  }
+
+  Future<void> _performLoadSettings() async {
     try {
       final db = _db;
 
@@ -67,11 +76,7 @@ class SettingsProvider extends ChangeNotifier {
         if (themeStr == 'system') _themeMode = ThemeMode.system;
       }
 
-      final accentStr = await db.getSetting('accent_color');
-      if (accentStr != null) {
-        final found = AppAccentColor.values.where((a) => a.name == accentStr).firstOrNull;
-        if (found != null) _accentColor = found;
-      }
+      _accentColor = AppAccentColor.slateBlue;
 
       final currencyStr = await db.getSetting('currency_code');
       if (currencyStr != null) {
@@ -101,8 +106,10 @@ class SettingsProvider extends ChangeNotifier {
       }
 
       final selectedAccStr = await db.getSetting('dashboard_selected_account_id');
-      if (selectedAccStr != null) {
+      if (selectedAccStr != null && selectedAccStr.trim().isNotEmpty) {
         _dashboardSelectedAccountId = selectedAccStr;
+      } else {
+        _dashboardSelectedAccountId = null;
       }
 
       final defaultTxAccStr = await db.getSetting('default_tx_account_id');
@@ -122,18 +129,46 @@ class SettingsProvider extends ChangeNotifier {
         if (found != null) _defaultTransactionType = found;
       }
 
+      // Reconcile and validate primary & selected account IDs against actual active persisted accounts
+      try {
+        final database = await db.database;
+        final activeAccounts = await database.query(
+          DbTables.accounts,
+          columns: [DbColumns.id],
+          where: '${DbColumns.isArchived} = 0',
+          orderBy: '${DbColumns.name} ASC',
+        );
+        final activeIds = activeAccounts.map((a) => a[DbColumns.id] as String).toSet();
+
+        if (activeIds.isNotEmpty) {
+          if (_primaryAccountId == null || !activeIds.contains(_primaryAccountId)) {
+            _primaryAccountId = activeIds.first;
+            await db.setSetting('primary_account_id', _primaryAccountId!);
+          }
+          if (_dashboardFocus == DashboardFocusMode.allAccounts) {
+            _dashboardSelectedAccountId = null;
+          } else if (_dashboardSelectedAccountId != null && !activeIds.contains(_dashboardSelectedAccountId)) {
+            _dashboardSelectedAccountId = _primaryAccountId;
+            await db.setSetting('dashboard_selected_account_id', _primaryAccountId!);
+          }
+        }
+      } catch (_) {}
+
       // Check onboarding state
       final onboardStr = await db.getSetting('is_onboarding_completed');
       if (onboardStr != null) {
         _isOnboardingCompleted = onboardStr == 'true';
       } else {
-        // Safe check for existing installations: if database already has transactions or custom profile, skip onboarding
+        // Safe check for existing installations: if database already has accounts, transactions, transfers, reminders, or custom profile, skip onboarding
         final database = await db.database;
+        final accountCount = Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM accounts')) ?? 0;
         final txCount = Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM transactions')) ?? 0;
         final transferCount = Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM transfers')) ?? 0;
+        final reminderCount = Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM reminders')) ?? 0;
+        final recurringCount = Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM recurring_transactions')) ?? 0;
         final hasCustomProfile = profileStr != null && profileStr.trim().isNotEmpty && profileStr.trim().toLowerCase() != 'user';
 
-        if (txCount > 0 || transferCount > 0 || hasCustomProfile) {
+        if (accountCount > 0 || txCount > 0 || transferCount > 0 || reminderCount > 0 || recurringCount > 0 || hasCustomProfile) {
           _isOnboardingCompleted = true;
           await db.setSetting('is_onboarding_completed', 'true');
         } else {
@@ -181,6 +216,8 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     if (accountId != null) {
       _db.setSetting('dashboard_selected_account_id', accountId);
+    } else {
+      _db.setSetting('dashboard_selected_account_id', '');
     }
   }
 
@@ -236,4 +273,3 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 }
-

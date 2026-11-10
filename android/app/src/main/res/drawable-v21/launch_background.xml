@@ -2,11 +2,18 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background" />
     <item
-        android:width="76dp"
-        android:height="76dp"
+        android:width="160dp"
+        android:height="160dp"
         android:gravity="center">
         <bitmap
             android:gravity="center"
             android:src="@drawable/splash_icon" />
+    </item>
+    <item
+        android:gravity="bottom|center_horizontal"
+        android:bottom="60dp">
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash_branding" />
     </item>
 </layer-list>

@@ -31,7 +31,7 @@ class TransactionAmountHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141D29) : Colors.white,
+        color: isDark ? AppColors.darkSurfaceCard : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: accentColor.withValues(alpha: 0.25),
@@ -106,7 +106,7 @@ class TransactionAmountHeader extends StatelessWidget {
 
               // Calculator Action Icon 🧮
               IconButton(
-                icon: const Icon(Icons.calculate_outlined),
+                icon: const Icon(Icons.calculate_rounded),
                 tooltip: 'Calculator',
                 color: accentColor,
                 iconSize: 26,

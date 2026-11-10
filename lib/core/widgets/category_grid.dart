@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../features/categories/domain/entities/category.dart';
 import '../theme/app_colors.dart';
+import 'app_category_icon.dart';
 
 class CategoryGrid extends StatelessWidget {
   final List<Category> categories;
@@ -31,16 +32,15 @@ class CategoryGrid extends StatelessWidget {
         crossAxisCount: 4,
         crossAxisSpacing: 8,
         mainAxisSpacing: 10,
-        childAspectRatio: 0.74,
+        childAspectRatio: 0.70,
       ),
       itemBuilder: (context, index) {
         if (index == visibleCategories.length) {
           // "More" category item
-          return _CategoryItem(
+          return _CategoryTile(
             icon: Icons.add_rounded,
             label: 'More',
-            color: isDark ? const Color(0xFF283646) : const Color(0xFFE2E8F0),
-            iconColor: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             isSelected: false,
             onTap: onMoreTap,
           );
@@ -48,9 +48,9 @@ class CategoryGrid extends StatelessWidget {
 
         final category = visibleCategories[index];
         final isSelected = category.id == selectedCategoryId;
-        final color = category.color != null ? Color(category.color!) : AppColors.primary;
+        final color = category.color != null ? Color(category.color!) : const Color(0xFF475569);
 
-        return _CategoryItem(
+        return _CategoryTile(
           icon: category.iconData,
           label: category.name,
           color: color,
@@ -62,19 +62,17 @@ class CategoryGrid extends StatelessWidget {
   }
 }
 
-class _CategoryItem extends StatelessWidget {
+class _CategoryTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  final Color? iconColor;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _CategoryItem({
+  const _CategoryTile({
     required this.icon,
     required this.label,
     required this.color,
-    this.iconColor,
     required this.isSelected,
     required this.onTap,
   });
@@ -90,47 +88,14 @@ class _CategoryItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? color.withValues(alpha: 0.2)
-                  : (isDark ? const Color(0xFF1E2838) : const Color(0xFFF1F5F9)),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected ? color : (isDark ? const Color(0xFF2C3A4E) : const Color(0xFFE2E8F0)),
-                width: isSelected ? 2.0 : 1.0,
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 26,
-                  color: isSelected ? color : (iconColor ?? (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)),
-                ),
-                if (isSelected)
-                  Positioned(
-                    right: 3,
-                    bottom: 3,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: isDark ? const Color(0xFF16202C) : Colors.white, width: 1.5),
-                      ),
-                      child: const Icon(Icons.check, size: 9, color: Colors.white),
-                    ),
-                  ),
-              ],
-            ),
+          AppCategoryIcon(
+            icon: icon,
+            color: color,
+            size: 48,
+            iconSize: 26,
+            isSelected: isSelected,
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           SizedBox(
             height: 28,
             child: Text(
