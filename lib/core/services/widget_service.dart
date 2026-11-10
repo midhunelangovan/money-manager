@@ -4,7 +4,7 @@ import '../../features/transactions/presentation/screens/add_edit_transaction_sc
 import '../navigation/navigation_service.dart';
 
 class WidgetService {
-  static const MethodChannel _channel = MethodChannel('com.kals.kals_money_manager/widget_channel');
+  static const MethodChannel _channel = MethodChannel('com.kals.kals_money_manager.dev/widget_channel');
   static bool _isInitialized = false;
   static bool isTestMode = false;
 

@@ -418,7 +418,7 @@ class AutomaticExportService {
         }
 
         // Generate workbook directly via ExcelExportService (saves to public Downloads)
-        final baseName = 'Kals_MoneyManager_Export_$dateStr.xlsx';
+        final baseName = 'Kals_V2_MoneyManager_Export_$dateStr.xlsx';
         final excelFile = await excelExportService.generateExcelWorkbook(
           filter: ExcelExportFilter(
             startDate: startDate,
@@ -448,7 +448,7 @@ class AutomaticExportService {
         // Validate payload content in memory
         backupService.validateBackupData(jsonStr);
 
-        final baseName = 'Kals_MoneyManager_Backup_$dateStr${AppConstants.backupFileExtension}';
+        final baseName = 'Kals_V2_MoneyManager_Backup_$dateStr${AppConstants.backupFileExtension}';
         final backupFile = await StorageHelper.saveToPublicDownloads(
           bytes: utf8.encode(jsonStr),
           fileName: baseName,
@@ -469,7 +469,7 @@ class AutomaticExportService {
       // Prune old exports according to retention policy
       await _pruneOldExports(
         directory: exportDir,
-        prefix: config.format == AutoExportFormat.excel ? 'Kals_MoneyManager_Export_' : 'Kals_MoneyManager_Backup_',
+        prefix: config.format == AutoExportFormat.excel ? 'Kals_V2_MoneyManager_Export_' : 'Kals_V2_MoneyManager_Backup_',
         extension: config.format == AutoExportFormat.excel ? '.xlsx' : AppConstants.backupFileExtension,
         maxRetained: config.retentionCount,
       );

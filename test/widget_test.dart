@@ -45,7 +45,7 @@ void main() {
       (MethodCall methodCall) async => 'UTC',
     );
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      const MethodChannel('com.kals.kals_money_manager/widget_channel'),
+      const MethodChannel('com.kals.kals_money_manager.dev/widget_channel'),
       (MethodCall methodCall) async => null,
     );
     sqfliteFfiInit();

@@ -159,7 +159,7 @@ class BackupService {
     final jsonStr = const JsonEncoder.withIndent('  ').convert(payload.toMap());
 
     final now = DateTime.now();
-    final fileName = 'MoneyManager_Backup_${DateFormatter.formatBackupStamp(now)}${AppConstants.backupFileExtension}';
+    final fileName = 'MoneyManager_V2_Backup_${DateFormatter.formatBackupStamp(now)}${AppConstants.backupFileExtension}';
 
     final file = await StorageHelper.saveToPublicDownloads(
       bytes: utf8.encode(jsonStr),
