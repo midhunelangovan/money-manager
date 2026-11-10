@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/constants/app_category_icons.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utilities/date_formatter.dart';
+import '../../../../core/widgets/app_category_icon.dart';
 import '../../../../core/widgets/app_drawer.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/empty_state.dart';
@@ -58,14 +61,11 @@ class _RecurringScreenState extends State<RecurringScreen> {
                 onPressed: () async {
                   final result = await recProvider.processDueTransactions();
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          result.generatedTransactionsCount > 0
-                              ? 'Generated ${result.generatedTransactionsCount} due transactions.'
-                              : 'All recurring schedules are up to date.',
-                        ),
-                      ),
+                    AppSnackBar.showSuccess(
+                      context,
+                      result.generatedTransactionsCount > 0
+                          ? 'Generated ${result.generatedTransactionsCount} due transactions.'
+                          : 'All recurring schedules are up to date.',
                     );
                   }
                 },
@@ -120,7 +120,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
         color: isDark ? AppColors.darkSurfaceCard : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
         ),
       ),
       child: Padding(
@@ -130,14 +130,14 @@ class _RecurringScreenState extends State<RecurringScreen> {
           children: [
             Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.repeat_rounded, color: color, size: 22),
+                AppCategoryIcon(
+                  icon: item.categoryIcon != null && item.categoryIcon!.isNotEmpty
+                      ? AppCategoryIcons.getIconData(item.categoryIcon!)
+                      : Icons.repeat_rounded,
+                  color: color,
+                  size: 44,
+                  iconSize: 24,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -165,13 +165,46 @@ class _RecurringScreenState extends State<RecurringScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${item.frequency.displayName} • ${item.accountName ?? "Account"}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                        ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '${item.frequency.displayName} • ${item.accountName ?? "Account"}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (item.remindMe) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.notifications_active_rounded, size: 11, color: AppColors.primary),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    item.reminderLeadDays == 0 ? 'Due date' : '${item.reminderLeadDays}d before',
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -181,7 +214,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   style: AppTypography.amountMedium.copyWith(
                     color: item.transactionType.displayName == 'Income'
                         ? AppColors.income
-                        : (isDark ? const Color(0xFFFB7185) : AppColors.expense),
+                        : AppColors.expense,
                   ),
                 ),
               ],
@@ -193,7 +226,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
                 Row(
                   children: [
                     Icon(
-                      Icons.event_outlined,
+                      Icons.event_rounded,
                       size: 14,
                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                     ),
@@ -217,15 +250,13 @@ class _RecurringScreenState extends State<RecurringScreen> {
                       ),
                       onPressed: () {
                         context.read<RecurringProvider>().skipNext(item);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Skipped next occurrence')),
-                        );
+                        AppSnackBar.showSuccess(context, 'Skipped next occurrence');
                       },
                       child: const Text('Skip Next', style: TextStyle(fontSize: 12)),
                     ),
                     PopupMenuButton<String>(
                       icon: Icon(
-                        Icons.more_vert,
+                        Icons.more_vert_rounded,
                         size: 18,
                         color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                       ),

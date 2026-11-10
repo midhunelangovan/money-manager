@@ -6,9 +6,11 @@ class AppCard extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final Color? color;
   final Border? border;
   final double borderRadius;
+  final double? width;
 
   const AppCard({
     super.key,
@@ -16,9 +18,11 @@ class AppCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(16),
     this.margin,
     this.onTap,
+    this.onLongPress,
     this.color,
     this.border,
     this.borderRadius = 16,
+    this.width = double.infinity,
   });
 
   @override
@@ -28,6 +32,7 @@ class AppCard extends StatelessWidget {
     final defaultBorder = isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
     Widget content = Container(
+      width: width,
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
@@ -38,11 +43,12 @@ class AppCard extends StatelessWidget {
       child: child,
     );
 
-    if (onTap != null) {
+    if (onTap != null || onLongPress != null) {
       return Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(borderRadius),
           child: content,
         ),

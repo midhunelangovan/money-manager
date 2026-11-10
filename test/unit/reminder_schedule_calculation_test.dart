@@ -16,14 +16,14 @@ void main() {
       const id1 = 'rem_123456789';
       const id2 = 'rem_987654321';
 
-      final nid1_a = NotificationService.getNotificationId(id1);
-      final nid1_b = NotificationService.getNotificationId(id1);
+      final nid1A = NotificationService.getNotificationId(id1);
+      final nid1B = NotificationService.getNotificationId(id1);
       final nid2 = NotificationService.getNotificationId(id2);
 
-      expect(nid1_a, nid1_b, reason: 'Must be 100% deterministic');
-      expect(nid1_a != nid2, true, reason: 'Different IDs produce different hash codes');
-      expect(nid1_a > 0, true, reason: 'Must be strictly positive');
-      expect(nid1_a <= 0x7FFFFFFF, true, reason: 'Must fit in positive 31-bit int');
+      expect(nid1A, nid1B, reason: 'Must be 100% deterministic');
+      expect(nid1A != nid2, true, reason: 'Different IDs produce different hash codes');
+      expect(nid1A > 0, true, reason: 'Must be strictly positive');
+      expect(nid1A <= 0x7FFFFFFF, true, reason: 'Must fit in positive 31-bit int');
     });
   });
 

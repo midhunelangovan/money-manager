@@ -5,12 +5,14 @@ enum LedgerTabType {
   expenses,
   income,
   transfer,
+  all,
 }
 
 class TransactionTypeTabs extends StatelessWidget {
   final LedgerTabType selectedTab;
   final ValueChanged<LedgerTabType> onTabSelected;
   final bool showTransfer;
+  final bool showAll;
   final bool isHeaderStyle;
 
   const TransactionTypeTabs({
@@ -18,6 +20,7 @@ class TransactionTypeTabs extends StatelessWidget {
     required this.selectedTab,
     required this.onTabSelected,
     this.showTransfer = false,
+    this.showAll = false,
     this.isHeaderStyle = true,
   });
 
@@ -25,6 +28,15 @@ class TransactionTypeTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        if (showAll)
+          Expanded(
+            child: _TabItem(
+              label: 'ALL',
+              isSelected: selectedTab == LedgerTabType.all,
+              onTap: () => onTabSelected(LedgerTabType.all),
+              isHeaderStyle: isHeaderStyle,
+            ),
+          ),
         Expanded(
           child: _TabItem(
             label: 'EXPENSES',
@@ -76,7 +88,7 @@ class _TabItem extends StatelessWidget {
         ? Colors.white
         : (isDark ? AppColors.darkTextPrimary : theme.colorScheme.primary);
     final inactiveTextColor = isHeaderStyle
-        ? Colors.white.withValues(alpha: 0.6)
+        ? Colors.white.withValues(alpha: 0.72)
         : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary);
 
     final underlineColor = isHeaderStyle
@@ -87,30 +99,34 @@ class _TabItem extends StatelessWidget {
       onTap: onTap,
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
+      child: SizedBox(
+        height: 38,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
               label,
               style: TextStyle(
                 color: isSelected ? activeTextColor : inactiveTextColor,
                 fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                letterSpacing: 1.0,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: 0.8,
+                height: 1.2,
               ),
               textAlign: TextAlign.center,
             ),
-          ),
-          Container(
-            height: 3,
-            decoration: BoxDecoration(
-              color: isSelected ? underlineColor : Colors.transparent,
-              borderRadius: BorderRadius.circular(2),
+            const SizedBox(height: 5),
+            Container(
+              width: 56,
+              height: 2.5,
+              decoration: BoxDecoration(
+                color: isSelected ? underlineColor : Colors.transparent,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

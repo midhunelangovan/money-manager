@@ -197,7 +197,7 @@ void main() {
       // Accent color
       provider.setAccentColor(AppAccentColor.blue);
       expect(provider.accentColor, equals(AppAccentColor.blue));
-      expect(provider.accentColor.primary, equals(const Color(0xFF1D5C96)));
+      expect(provider.accentColor.primary, equals(const Color(0xFF03323A)));
 
       provider.setAccentColor(AppAccentColor.green);
       expect(provider.accentColor, equals(AppAccentColor.green));

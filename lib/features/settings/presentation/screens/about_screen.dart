@@ -107,7 +107,7 @@ class AboutScreen extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.shield_outlined, color: AppColors.primary, size: 20),
+                            const Icon(Icons.shield_rounded, color: AppColors.primary, size: 20),
                             const SizedBox(width: 8),
                             Text(
                               'Offline Privacy & Data Safety',

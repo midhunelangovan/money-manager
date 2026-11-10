@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
@@ -81,7 +82,6 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
     AccountProvider accountProvider,
   ) async {
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
 
     if (diffUnits != 0) {
       final isDiffPositive = diffUnits > 0;
@@ -143,17 +143,14 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
       }
       if (mounted) {
         navigator.pop(true);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Account balance updated to ${parsedNewBalance.format(currency: settings.currency)}'),
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          'Account balance updated to ${parsedNewBalance.format(currency: settings.currency)}',
         );
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Error updating balance: $e')),
-        );
+        AppSnackBar.showError(context, 'Error updating balance: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -181,7 +178,7 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
         bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 16,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF16202C) : Colors.white,
+        color: isDark ? AppColors.darkSurfaceCard : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
@@ -265,7 +262,7 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E2838) : const Color(0xFFF8FAFC),
+              color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isDark ? Colors.white12 : Colors.black12,
@@ -296,7 +293,7 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E2838) : const Color(0xFFF1F5F9),
+              color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: AppColors.primary.withValues(alpha: 0.35),
@@ -354,7 +351,7 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E2838) : const Color(0xFFF8FAFC),
+              color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06),

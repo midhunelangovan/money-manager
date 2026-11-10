@@ -27,23 +27,27 @@ class DonutChart extends StatelessWidget {
   final double size;
   final double strokeWidth;
   final bool isEmpty;
+  final bool isLoading;
   final String emptyMessage;
   final ValueChanged<DonutSegment>? onSegmentTapped;
+  final VoidCallback? onCenterTapped;
 
   const DonutChart({
     super.key,
     required this.segments,
     required this.centerAmount,
     this.centerLabel,
-    this.size = 200,
-    this.strokeWidth = 22,
+    this.size = 230,
+    this.strokeWidth = 24,
     this.isEmpty = false,
-    this.emptyMessage = 'There were no transactions in this period',
+    this.isLoading = false,
+    this.emptyMessage = 'There were no expenses in this week',
     this.onSegmentTapped,
+    this.onCenterTapped,
   });
 
   void _handleTap(TapUpDetails details) {
-    if (isEmpty || segments.isEmpty || onSegmentTapped == null) return;
+    if (isLoading) return;
 
     final center = Offset(size / 2, size / 2);
     final localPos = details.localPosition;
@@ -54,14 +58,23 @@ class DonutChart extends StatelessWidget {
     final outerRadius = size / 2;
     final innerRadius = outerRadius - strokeWidth;
 
+    // Center tapped (inner area)
+    if (distance < innerRadius - 8) {
+      if (onCenterTapped != null) {
+        onCenterTapped!();
+      }
+      return;
+    }
+
+    if (isEmpty || segments.isEmpty || onSegmentTapped == null) return;
+
     // Allow tap anywhere in ring or slightly generous touch target
-    if (distance < innerRadius - 12 || distance > outerRadius + 12) {
+    if (distance > outerRadius + 14) {
       return;
     }
 
     // Angle in radians from 12 o'clock (-pi/2) going clockwise [0, 2*pi)
     double angle = math.atan2(dy, dx);
-    // Convert to angle starting at -pi/2
     double relAngle = angle - (-math.pi / 2);
     while (relAngle < 0) {
       relAngle += 2 * math.pi;
@@ -105,34 +118,48 @@ class DonutChart extends StatelessWidget {
                   segments: segments,
                   strokeWidth: strokeWidth,
                   isDark: isDark,
-                  isEmpty: isEmpty,
+                  isEmpty: isEmpty || isLoading,
                 ),
               ),
 
-              // Center Content (Total Amount + Label / Empty Text)
+              // Center Content (Loading / Total Amount + Label / Empty Text)
               Padding(
-                padding: EdgeInsets.all(strokeWidth + 8),
+                padding: EdgeInsets.all(strokeWidth + 12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (isEmpty) ...[
-                      Icon(
-                        Icons.circle_outlined,
-                        size: 28,
-                        color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+                    if (isLoading) ...[
+                      SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            isDark ? AppColors.darkPrimary : AppColors.primary,
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Loading...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        ),
+                      ),
+                    ] else if (isEmpty) ...[
                       Text(
                         emptyMessage,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          height: 1.2,
+                          color: isDark ? AppColors.darkTextSecondary : const Color(0xFF6B7280),
+                          height: 1.35,
                         ),
-                        maxLines: 3,
+                        maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ] else ...[
@@ -140,22 +167,22 @@ class DonutChart extends StatelessWidget {
                         Text(
                           centerLabel!,
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
-                            letterSpacing: 0.5,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppColors.darkTextMuted : const Color(0xFF8E95A2),
+                            letterSpacing: 0.6,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                       ],
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
                           centerAmount,
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 24,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            color: isDark ? AppColors.darkTextPrimary : const Color(0xFF1B1E24),
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -190,15 +217,32 @@ class _DonutChartPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
 
-    // Background track ring
+    // Background track ring in clean subtle border neutral
     final bgPaint = Paint()
-      ..color = isDark ? const Color(0xFF1E2838) : const Color(0xFFE8EEEC)
+      ..color = isDark ? AppColors.darkBorder : AppColors.lightBorder
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
 
     canvas.drawCircle(center, radius, bgPaint);
 
     if (isEmpty || segments.isEmpty) {
+      // Subtle dashed inner circle treatment
+      final innerRadius = radius - strokeWidth / 2 - 8;
+      if (innerRadius > 0) {
+        final dashedPaint = Paint()
+          ..color = isDark ? Colors.white12 : AppColors.lightBorderSubtle
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2;
+
+        const double dashAngle = 0.08;
+        const double gapAngle = 0.06;
+        double curAngle = 0.0;
+        final rect = Rect.fromCircle(center: center, radius: innerRadius);
+        while (curAngle < 2 * math.pi) {
+          canvas.drawArc(rect, curAngle, dashAngle, false, dashedPaint);
+          curAngle += dashAngle + gapAngle;
+        }
+      }
       return;
     }
 

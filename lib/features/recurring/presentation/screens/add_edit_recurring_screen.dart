@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/navigation/navigation_service.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/date_formatter.dart';
 import '../../../../core/utilities/id_generator.dart';
 import '../../../../core/utilities/money.dart';
@@ -37,6 +40,8 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
   DateTime? _endDate;
   String? _selectedAccountId;
   String? _selectedCategoryId;
+  bool _remindMe = false;
+  int _reminderLeadDays = 0;
   bool _isSaving = false;
 
   @override
@@ -54,6 +59,8 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
     _endDate = rec?.endDate;
     _selectedAccountId = rec?.accountId;
     _selectedCategoryId = rec?.categoryId;
+    _remindMe = rec?.remindMe ?? false;
+    _reminderLeadDays = rec?.reminderLeadDays ?? 0;
   }
 
   @override
@@ -87,9 +94,7 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
         builder: (_) => CategoriesScreen(
           isPickerMode: true,
           initialType: _type,
-          onCategorySelected: (cat) {
-            setState(() => _selectedCategoryId = cat.id);
-          },
+          selectedCategoryId: _selectedCategoryId,
         ),
       ),
     );
@@ -101,31 +106,23 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
   Future<void> _save() async {
     final desc = _descriptionController.text.trim();
     if (desc.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a description for this recurring schedule')),
-      );
+      AppSnackBar.showError(context, 'Please enter a description for this recurring schedule');
       return;
     }
 
     final amountParsed = Money.tryParse(_amountController.text);
     if (amountParsed == null || amountParsed.units <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid amount greater than zero')),
-      );
+      AppSnackBar.showError(context, 'Please enter a valid amount greater than zero');
       return;
     }
 
     if (_selectedAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an account')),
-      );
+      AppSnackBar.showError(context, 'Please select an account');
       return;
     }
 
     if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category')),
-      );
+      AppSnackBar.showError(context, 'Please select a category');
       return;
     }
 
@@ -133,6 +130,76 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
 
     try {
       final now = DateTime.now();
+      DateTime nextRun = _startDate;
+
+      if (widget.initialRecurring == null) {
+        final currentMonthStart = DateTime(now.year, now.month, 1);
+        final isPastMonth = _startDate.isBefore(currentMonthStart);
+
+        if (isPastMonth) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final currentMonthLabel = DateFormatter.formatMonthYear(now);
+          final result = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: isDark ? AppColors.darkSurfaceCard : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(
+                'Include payment for $currentMonthLabel?',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                ),
+              ),
+              content: Text(
+                'The start date (${DateFormatter.formatDate(_startDate)}) is in the past. Would you like to include this payment for $currentMonthLabel or start from next month?',
+                style: TextStyle(
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(
+                    'Start from next month',
+                    style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Include this month'),
+                ),
+              ],
+            ),
+          );
+
+          if (result == null) {
+            if (mounted) setState(() => _isSaving = false);
+            return;
+          }
+
+          if (result == true) {
+            final maxDaysInCurrentMonth = DateTime(now.year, now.month + 1, 0).day;
+            final targetDay = _startDate.day.clamp(1, maxDaysInCurrentMonth);
+            nextRun = DateTime(now.year, now.month, targetDay, _startDate.hour, _startDate.minute);
+          } else {
+            final nextMonth = now.month == 12 ? 1 : now.month + 1;
+            final nextYear = now.month == 12 ? now.year + 1 : now.year;
+            final maxDaysInNextMonth = DateTime(nextYear, nextMonth + 1, 0).day;
+            final targetDay = _startDate.day.clamp(1, maxDaysInNextMonth);
+            nextRun = DateTime(nextYear, nextMonth, targetDay, _startDate.hour, _startDate.minute);
+          }
+        }
+      } else {
+        nextRun = widget.initialRecurring!.nextExecutionDate;
+      }
+
       final recurring = RecurringTransaction(
         id: widget.initialRecurring?.id ?? IdGenerator.generate(),
         transactionType: _type,
@@ -144,11 +211,15 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
         interval: _interval,
         startDate: _startDate,
         endDate: _endDate,
-        nextExecutionDate: widget.initialRecurring?.nextExecutionDate ?? _startDate,
+        nextExecutionDate: nextRun,
         isActive: widget.initialRecurring?.isActive ?? true,
+        remindMe: _remindMe,
+        reminderLeadDays: _reminderLeadDays,
         createdAt: widget.initialRecurring?.createdAt ?? now,
         updatedAt: now,
       );
+
+      if (!mounted) return;
 
       if (widget.initialRecurring != null) {
         await context.read<RecurringProvider>().updateRecurring(recurring);
@@ -157,13 +228,32 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
       }
 
       if (mounted) {
+        final isNew = widget.initialRecurring == null;
+        final hasReminder = _remindMe;
+        final leadDays = _reminderLeadDays;
         Navigator.of(context).pop(true);
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final rootContext = MainNavigationService.navigatorKey.currentContext;
+          if (rootContext != null && rootContext.mounted) {
+            final messenger = ScaffoldMessenger.maybeOf(rootContext);
+            if (messenger != null) {
+              messenger.clearSnackBars();
+              final successMsg = isNew
+                  ? (hasReminder
+                      ? 'Recurring payment added successfully. Reminder set for ${leadDays == 0 ? "due date" : "$leadDays days before"}.'
+                      : 'Recurring payment added successfully.')
+                  : (hasReminder
+                      ? 'Recurring payment updated successfully. Reminder set for ${leadDays == 0 ? "due date" : "$leadDays days before"}.'
+                      : 'Recurring payment updated successfully.');
+              AppSnackBar.showSuccess(rootContext, successMsg);
+            }
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save recurring schedule: $e')),
-        );
+        AppSnackBar.showError(context, 'Failed to save recurring schedule: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -372,6 +462,86 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
                   ),
                 ),
 
+                const SizedBox(height: 12),
+
+                // 7. Payment Reminders (Remind me with lead days selection)
+                AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.notifications_active_rounded,
+                                size: 20,
+                                color: _remindMe
+                                    ? AppColors.primary
+                                    : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Remind me',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Switch.adaptive(
+                            value: _remindMe,
+                            activeTrackColor: AppColors.primary,
+                            activeThumbColor: Colors.white,
+                            onChanged: (val) async {
+                              if (val) {
+                                final granted = await NotificationService().requestPermissions();
+                                if (!granted) {
+                                  if (!context.mounted) return;
+                                  AppSnackBar.showError(
+                                    context,
+                                    'Notifications are disabled. Please enable them in settings to receive reminders.',
+                                  );
+                                }
+                              }
+                              if (mounted) {
+                                setState(() => _remindMe = val);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      if (_remindMe) ...[
+                        const Divider(height: 20),
+                        Text(
+                          'NOTIFICATION TIMING',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildLeadDayChip(0, 'On due date', isDark),
+                            _buildLeadDayChip(1, '1 day before', isDark),
+                            _buildLeadDayChip(3, '3 days before', isDark),
+                            _buildLeadDayChip(7, '7 days before', isDark),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
                 const SizedBox(height: 24),
 
                 ElevatedButton(
@@ -398,6 +568,40 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLeadDayChip(int days, String label, bool isDark) {
+    final isSelected = _reminderLeadDays == days;
+    return InkWell(
+      onTap: () => setState(() => _reminderLeadDays = days),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: isDark ? 0.22 : 0.12)
+              : (isDark ? AppColors.darkSurface : AppColors.lightSurfaceElevated),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primary
+                : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected
+                ? AppColors.primary
+                : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+          ),
+        ),
       ),
     );
   }

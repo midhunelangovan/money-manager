@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/navigation/navigation_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/id_generator.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/app_card.dart';
@@ -65,9 +67,7 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
   Future<void> _save() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an account name')),
-      );
+      AppSnackBar.showError(context, 'Please enter an account name');
       return;
     }
 
@@ -117,13 +117,21 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
       }
 
       if (mounted) {
+        final isEdit = acc != null;
         Navigator.pop(context, true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final rootContext = MainNavigationService.navigatorKey.currentContext;
+          if (rootContext != null && rootContext.mounted) {
+            AppSnackBar.showSuccess(
+              rootContext,
+              isEdit ? 'Account updated successfully.' : 'Account created successfully.',
+            );
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving account: $e')),
-        );
+        AppSnackBar.showError(context, 'Error saving account: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -228,19 +236,20 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
       try {
         await provider.deleteAccount(acc.id);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Account "${acc.name}" deleted. Historical transactions preserved.'),
-              duration: const Duration(seconds: 3),
-            ),
-          );
           Navigator.pop(context, true);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final rootContext = MainNavigationService.navigatorKey.currentContext;
+            if (rootContext != null && rootContext.mounted) {
+              AppSnackBar.showSuccess(
+                rootContext,
+                'Account "${acc.name}" deleted. Historical transactions preserved.',
+              );
+            }
+          });
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete account: $e')),
-          );
+          AppSnackBar.showError(context, 'Failed to delete account: $e');
         }
       } finally {
         if (mounted) setState(() => _isDeleting = false);
@@ -321,10 +330,10 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E2838) : const Color(0xFFF1F5F9),
+                          color: isDark ? AppColors.darkInputSurface : AppColors.lightInputSurface,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3),
+                            color: isDark ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.4) : AppColors.primary.withValues(alpha: 0.3),
                             width: 1.5,
                           ),
                         ),
@@ -334,7 +343,7 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
                               settingsProvider.currency.symbol,
                               style: AppTypography.displaySmall.copyWith(
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
+                                color: isDark ? Theme.of(context).colorScheme.primary : AppColors.primary,
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -387,7 +396,7 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
                       return AppSelectItem<AccountType>(
                         value: t,
                         title: t.displayName,
-                        icon: Icons.account_balance_wallet_outlined,
+                        icon: Icons.account_balance_wallet_rounded,
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -459,15 +468,16 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
                 ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: isDark ? Theme.of(context).colorScheme.primary : AppColors.primary,
+                    foregroundColor: isDark ? AppColors.darkBackground : Colors.white,
                     minimumSize: const Size.fromHeight(52),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: _isSaving
-                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                      ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: isDark ? AppColors.darkBackground : Colors.white, strokeWidth: 2.5))
                       : Text(
                           acc != null ? 'Save Changes' : 'Create Account',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? AppColors.darkBackground : Colors.white),
                         ),
                 ),
 

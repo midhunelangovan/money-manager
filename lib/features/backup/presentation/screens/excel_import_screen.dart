@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utilities/id_generator.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_category_icon.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../accounts/presentation/providers/account_provider.dart';
 import '../../../categories/domain/entities/category.dart';
@@ -486,6 +487,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         onTap: () {
                           provider.updateCategoryMapping(
                             legacyName: legacyName,
+                            categoryType: expectedType,
                             targetCategoryId: currentEntry.targetCategoryId ?? IdGenerator.generate(),
                             targetCategoryName: legacyName,
                             status: MappingStatus.createNew,
@@ -577,6 +579,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                             onPressed: () {
                               provider.updateCategoryMapping(
                                 legacyName: legacyName,
+                                categoryType: expectedType,
                                 targetCategoryId: null,
                                 targetCategoryName: null,
                                 status: MappingStatus.ignored,
@@ -636,18 +639,12 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                                   return ListTile(
                                     dense: true,
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    leading: Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: (cat.color != null ? Color(cat.color!) : AppColors.primary).withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Icon(
-                                        cat.iconData,
-                                        size: 18,
-                                        color: cat.color != null ? Color(cat.color!) : AppColors.primary,
-                                      ),
+                                    leading: AppCategoryIcon(
+                                      icon: cat.iconData,
+                                      color: cat.color != null ? Color(cat.color!) : AppColors.primary,
+                                      size: 36,
+                                      iconSize: 20,
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     title: Text(
                                       cat.name,
@@ -671,6 +668,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                                     onTap: () {
                                       provider.updateCategoryMapping(
                                         legacyName: legacyName,
+                                        categoryType: expectedType,
                                         targetCategoryId: cat.id,
                                         targetCategoryName: cat.name,
                                         status: MappingStatus.exactMatch,
@@ -840,6 +838,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
   }
 
   Widget _buildFileAndSheetSelector(BuildContext context, ExcelImportProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final workbook = provider.workbookInfo;
     final selectedSheets = provider.selectedSheetNames;
 
@@ -859,18 +858,26 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                 child: const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 22),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Legacy Excel Importer',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'Select your legacy spreadsheet (.xlsx). You can select multiple sheets (Expenses, Income, Transfers) and map legacy accounts/categories to your existing Kals structure in a single unified step.',
-                      style: TextStyle(fontSize: 12, color: AppColors.lightTextSecondary, height: 1.4),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ),
@@ -879,12 +886,12 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           '1. SELECT EXCEL FILE',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: AppColors.lightTextSecondary,
+            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
             letterSpacing: 0.5,
           ),
         ),
@@ -895,7 +902,10 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (workbook == null) ...[
-                const Text('No file selected', style: TextStyle(fontSize: 14, color: AppColors.lightTextSecondary)),
+                Text(
+                  'No file selected',
+                  style: TextStyle(fontSize: 14, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -924,18 +934,25 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         children: [
                           Text(
                             workbook.fileName,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             '${workbook.sheetNames.length} sheet(s) detected',
-                            style: const TextStyle(fontSize: 12, color: AppColors.lightTextSecondary),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.refresh_rounded, color: AppColors.lightTextSecondary),
+                      icon: Icon(Icons.refresh_rounded, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                       tooltip: 'Change File',
                       onPressed: () => provider.pickExcelFile(),
                     ),
@@ -950,12 +967,12 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 '2. SELECT SHEETS TO IMPORT',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.lightTextSecondary,
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -1007,7 +1024,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         children: [
                           Text(
                             sheetName,
-                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary),
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -1049,6 +1070,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
   }
 
   Widget _buildAccountMappingStep(BuildContext context, ExcelImportProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final accountMappings = provider.accountMappings;
     final entries = accountMappings.values.toList();
 
@@ -1062,7 +1084,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
         // Summary bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          color: AppColors.lightSurface,
+          color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurface,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1070,14 +1092,22 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                 children: [
                   const Icon(Icons.account_balance_rounded, size: 20, color: AppColors.primary),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'ACCOUNT MAPPING',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.lightTextPrimary),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                    ),
                   ),
                   const Spacer(),
                   Text(
                     '${entries.length} detected',
-                    style: const TextStyle(fontSize: 12, color: AppColors.lightTextSecondary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -1088,20 +1118,27 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                   const SizedBox(width: 8),
                   _buildBadgeSummary('Suggested', '$suggestedCount', const Color(0xFFD97706)),
                   const SizedBox(width: 8),
-                  _buildBadgeSummary('Unmapped', '$unmappedCount', unmappedCount > 0 ? AppColors.expense : AppColors.lightTextSecondary),
+                  _buildBadgeSummary(
+                    'Unmapped',
+                    '$unmappedCount',
+                    unmappedCount > 0 ? AppColors.expense : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                  ),
                 ],
               ),
               if (unmappedCount > 0) ...[
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Map all legacy accounts to existing Kals accounts, or create new ones before proceeding.',
-                  style: TextStyle(fontSize: 11.5, color: AppColors.lightTextSecondary),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  ),
                 ),
               ],
             ],
           ),
         ),
-        const Divider(height: 1),
+        Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 1),
 
         // Accounts list
         Expanded(
@@ -1111,6 +1148,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
             itemBuilder: (context, index) {
               final entry = entries[index];
               return _buildMappingCard(
+                context: context,
                 title: entry.legacyName,
                 subtitle: '${entry.transactionCount} transaction(s)',
                 targetName: entry.targetAccountName,
@@ -1135,13 +1173,13 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
         // Bottom continue button
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: AppColors.lightSurface,
-            border: Border(top: BorderSide(color: AppColors.lightBorder)),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurface,
+            border: Border(top: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
           ),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: canProceed ? AppColors.primary : AppColors.lightBorder,
+              backgroundColor: canProceed ? AppColors.primary : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(50),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1168,6 +1206,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
   }
 
   Widget _buildCategoryMappingStep(BuildContext context, ExcelImportProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final categoryMappings = provider.categoryMappings;
     final entries = categoryMappings.values.toList();
 
@@ -1181,7 +1220,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
         // Summary bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          color: AppColors.lightSurface,
+          color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurface,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1189,14 +1228,22 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                 children: [
                   const Icon(Icons.category_rounded, size: 20, color: AppColors.primary),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'CATEGORY MAPPING',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.lightTextPrimary),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                    ),
                   ),
                   const Spacer(),
                   Text(
                     '${entries.length} detected',
-                    style: const TextStyle(fontSize: 12, color: AppColors.lightTextSecondary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -1207,20 +1254,27 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                   const SizedBox(width: 8),
                   _buildBadgeSummary('Suggested', '$suggestedCount', const Color(0xFFD97706)),
                   const SizedBox(width: 8),
-                  _buildBadgeSummary('Unmapped', '$unmappedCount', unmappedCount > 0 ? AppColors.expense : AppColors.lightTextSecondary),
+                  _buildBadgeSummary(
+                    'Unmapped',
+                    '$unmappedCount',
+                    unmappedCount > 0 ? AppColors.expense : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                  ),
                 ],
               ),
               if (unmappedCount > 0) ...[
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Map legacy categories to existing Kals categories, or create new ones before proceeding.',
-                  style: TextStyle(fontSize: 11.5, color: AppColors.lightTextSecondary),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  ),
                 ),
               ],
             ],
           ),
         ),
-        const Divider(height: 1),
+        Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 1),
 
         // Categories list
         Expanded(
@@ -1230,6 +1284,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
             itemBuilder: (context, index) {
               final entry = entries[index];
               return _buildMappingCard(
+                context: context,
                 title: entry.legacyName,
                 subtitle: '${entry.categoryType == CategoryType.income ? "Income" : "Expense"} • ${entry.transactionCount} transaction(s)',
                 targetName: entry.targetCategoryName,
@@ -1239,6 +1294,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                     ? () {
                         provider.updateCategoryMapping(
                           legacyName: entry.legacyName,
+                          categoryType: entry.categoryType,
                           targetCategoryId: entry.targetCategoryId,
                           targetCategoryName: entry.targetCategoryName,
                           status: MappingStatus.exactMatch,
@@ -1253,13 +1309,13 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
         // Bottom continue button
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: AppColors.lightSurface,
-            border: Border(top: BorderSide(color: AppColors.lightBorder)),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurface,
+            border: Border(top: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
           ),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: canProceed ? AppColors.primary : AppColors.lightBorder,
+              backgroundColor: canProceed ? AppColors.primary : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(50),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1276,6 +1332,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
   }
 
   Widget _buildMappingCard({
+    required BuildContext context,
     required String title,
     required String subtitle,
     required String? targetName,
@@ -1284,6 +1341,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
     required VoidCallback onTap,
     VoidCallback? onQuickConfirm,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color statusColor;
     String statusLabel;
     IconData statusIcon;
@@ -1310,94 +1368,169 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
         statusIcon = Icons.warning_amber_rounded;
         break;
       case MappingStatus.ignored:
-        statusColor = AppColors.lightTextSecondary;
+        statusColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
         statusLabel = 'Ignored';
         statusIcon = Icons.block_rounded;
         break;
     }
 
+    final displayTitle = title.trim().isEmpty || title.trim() == 'No category'
+        ? 'No category (Unspecified)'
+        : title.trim();
+    final hasTarget = targetName != null && targetName.trim().isNotEmpty;
+    final displayTarget = status == MappingStatus.ignored
+        ? 'Ignored (Will skip)'
+        : (status == MappingStatus.createNew
+            ? '+ Create "$displayTitle"'
+            : (hasTarget ? targetName.trim() : 'Choose category'));
+
+    final isUnmapped = status == MappingStatus.unmapped;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: AppCard(
+        border: isUnmapped
+            ? Border.all(color: AppColors.expense.withValues(alpha: 0.45), width: 1.2)
+            : null,
         padding: const EdgeInsets.all(14),
         onTap: onTap,
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          title,
-                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(statusIcon, size: 12, color: statusColor),
-                            const SizedBox(width: 4),
-                            Text(
-                              statusLabel,
-                              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: statusColor),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+            // Row 1: Leading Icon + Title + Status Badge
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
+                  child: Icon(
+                    status == MappingStatus.createNew
+                        ? Icons.add_rounded
+                        : (isUnmapped
+                            ? Icons.help_outline_rounded
+                            : (status == MappingStatus.ignored
+                                ? Icons.block_rounded
+                                : Icons.category_rounded)),
+                    color: statusColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    displayTitle,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.lightTextSecondary),
+                      Icon(statusIcon, size: 12, color: statusColor),
                       const SizedBox(width: 4),
                       Text(
-                        status == MappingStatus.ignored
-                            ? 'Ignored (Will skip)'
-                            : (status == MappingStatus.createNew
-                                ? '+ Create "$title"'
-                                : (targetName ?? 'Tap to select')),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: (targetName != null || status == MappingStatus.createNew) ? FontWeight.w600 : FontWeight.w400,
-                          color: status == MappingStatus.createNew
-                              ? AppColors.primary
-                              : (targetName != null ? AppColors.lightTextPrimary : AppColors.expense),
-                        ),
+                        statusLabel,
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor),
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Row 2: Target Mapping Selector Box
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isUnmapped
+                    ? AppColors.expense.withValues(alpha: 0.08)
+                    : (isDark ? AppColors.darkSurfaceElevated : AppColors.lightBackground),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isUnmapped
+                      ? AppColors.expense.withValues(alpha: 0.25)
+                      : (isDark ? AppColors.darkBorderSubtle : AppColors.lightBorder),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isUnmapped ? Icons.touch_app_rounded : Icons.arrow_forward_rounded,
+                    size: 14,
+                    color: isUnmapped
+                        ? AppColors.expense
+                        : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      displayTarget,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: (hasTarget || status == MappingStatus.createNew || isUnmapped)
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: status == MappingStatus.createNew
+                            ? AppColors.primary
+                            : (hasTarget
+                                ? (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)
+                                : (isUnmapped
+                                    ? AppColors.expense
+                                    : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary))),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  if (status == MappingStatus.suggested && onQuickConfirm != null)
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFD97706)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      onPressed: onQuickConfirm,
+                      child: const Text('Confirm', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706))),
+                    )
+                  else
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      size: 20,
+                    ),
                 ],
               ),
             ),
-            const SizedBox(width: 6),
-            const Icon(Icons.arrow_drop_down_rounded, size: 24, color: AppColors.lightTextSecondary),
-            if (status == MappingStatus.suggested && onQuickConfirm != null) ...[
-              const SizedBox(width: 8),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFD97706)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: onQuickConfirm,
-                child: const Text('Confirm', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706))),
+            const SizedBox(height: 6),
+
+            // Row 3: Subtitle
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
               ),
-            ] else ...[
-              const Icon(Icons.chevron_right_rounded, color: AppColors.lightTextSecondary),
-            ],
+            ),
           ],
         ),
       ),
@@ -1405,6 +1538,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
   }
 
   Widget _buildPreviewAndValidation(BuildContext context, ExcelImportProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final preview = provider.preview;
     if (preview == null) return const Center(child: Text('No preview data available.'));
 
@@ -1428,13 +1562,13 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
               // Summary cards
               Row(
                 children: [
-                  Expanded(child: _buildStatBox('Source Rows', '${preview.totalRows}', AppColors.primary)),
+                  Expanded(child: _buildStatBox(context, 'Source Rows', '${preview.totalRows}', AppColors.primary)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildStatBox('Valid to Import', '$validCount', AppColors.income)),
+                  Expanded(child: _buildStatBox(context, 'Valid to Import', '$validCount', AppColors.income)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildStatBox('Duplicates', '$duplicateCount', duplicateCount > 0 ? const Color(0xFFD97706) : AppColors.lightTextSecondary)),
+                  Expanded(child: _buildStatBox(context, 'Duplicates', '$duplicateCount', duplicateCount > 0 ? const Color(0xFFD97706) : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary))),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildStatBox('Invalid', '$invalidCount', invalidCount > 0 ? AppColors.expense : AppColors.lightTextSecondary)),
+                  Expanded(child: _buildStatBox(context, 'Invalid', '$invalidCount', invalidCount > 0 ? AppColors.expense : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary))),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1451,14 +1585,23 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'DETECTED DATE RANGE',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.lightTextSecondary, letterSpacing: 0.5),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               dateRangeText,
-                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary),
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                              ),
                             ),
                           ],
                         ),
@@ -1491,14 +1634,23 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         children: [
                           const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.primary),
                           const SizedBox(width: 8),
-                          const Text(
+                          Text(
                             'MONTH COVERAGE',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.lightTextSecondary, letterSpacing: 0.5),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                           const Spacer(),
                           Text(
                             '${preview.totalRows} records across ${sourceCoverage.length} months',
-                            style: const TextStyle(fontSize: 11, color: AppColors.lightTextSecondary, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -1510,16 +1662,20 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: AppColors.lightBackground,
+                              color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightBackground,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.lightBorder),
+                              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   entry.key,
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.lightTextPrimary),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                  ),
                                 ),
                                 const SizedBox(width: 6),
                                 Container(
@@ -1550,14 +1706,21 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('SHEET BREAKDOWN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.lightTextSecondary)),
+                    Text(
+                      'SHEET BREAKDOWN',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildBreakdownItem('Expenses', '${preview.expensesCount}', AppColors.expense),
-                        _buildBreakdownItem('Income', '${preview.incomeCount}', AppColors.income),
-                        _buildBreakdownItem('Transfers', '${preview.transfersCount}', AppColors.transfer),
+                        _buildBreakdownItem(context, 'Expenses', '${preview.expensesCount}', AppColors.expense),
+                        _buildBreakdownItem(context, 'Income', '${preview.incomeCount}', AppColors.income),
+                        _buildBreakdownItem(context, 'Transfers', '${preview.transfersCount}', AppColors.transfer),
                       ],
                     ),
                   ],
@@ -1584,9 +1747,12 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'These rows cannot be imported and will be skipped:',
-                        style: TextStyle(fontSize: 11.5, color: AppColors.lightTextSecondary),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ...preview.invalidRows.take(10).map((inv) {
@@ -1597,7 +1763,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                             children: [
                               Text(
                                 '${inv.sheetName} Row ${inv.rowNumber}: ',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                ),
                               ),
                               Expanded(
                                 child: Text(
@@ -1613,7 +1783,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'And ${invalidCount - 10} more invalid row(s)...',
-                          style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.lightTextSecondary),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
                         ),
                       ],
                     ],
@@ -1628,23 +1802,28 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.view_column_rounded, size: 18, color: AppColors.primary),
-                        SizedBox(width: 8),
+                        const Icon(Icons.view_column_rounded, size: 18, color: AppColors.primary),
+                        const SizedBox(width: 8),
                         Text(
                           'COLUMN MAPPING',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.lightTextSecondary, letterSpacing: 0.5),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _buildColumnMappingRow('Date', 'Transaction Date ✓'),
-                    _buildColumnMappingRow('Amount', 'Amount ✓'),
-                    _buildColumnMappingRow('Account', 'Kals Account ✓'),
+                    _buildColumnMappingRow(context, 'Date', 'Transaction Date ✓'),
+                    _buildColumnMappingRow(context, 'Amount', 'Amount ✓'),
+                    _buildColumnMappingRow(context, 'Account', 'Kals Account ✓'),
                     if (preview.sheetType != ExcelSheetType.transfers)
-                      _buildColumnMappingRow('Category', 'Kals Category ✓'),
-                    _buildColumnMappingRow('Comment', 'Transaction Comment ✓'),
+                      _buildColumnMappingRow(context, 'Category', 'Kals Category ✓'),
+                    _buildColumnMappingRow(context, 'Comment', 'Transaction Comment ✓'),
                   ],
                 ),
               ),
@@ -1663,12 +1842,22 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Skip $duplicateCount Duplicate(s)', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                            Text(
+                              'Skip $duplicateCount Duplicate(s)',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                              ),
+                            ),
                             Text(
                               provider.skipDuplicates
                                   ? 'Existing matching transactions will not be re-imported'
                                   : 'Duplicates will be imported alongside existing records',
-                              style: const TextStyle(fontSize: 11, color: AppColors.lightTextSecondary),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              ),
                             ),
                           ],
                         ),
@@ -1688,19 +1877,46 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'SAMPLE IMPORT TRANSACTIONS',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.lightTextSecondary, letterSpacing: 0.5),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                   Text(
                     'Showing ${preview.previewItems.length} of $validCount',
-                    style: const TextStyle(fontSize: 11.5, color: AppColors.lightTextSecondary),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
 
               ...preview.previewItems.map((item) {
+                String mainLabel;
+                if (item.sheetType == ExcelSheetType.transfers) {
+                  final outAcc = (item.mappedOutgoingAccountName != null && item.mappedOutgoingAccountName!.trim().isNotEmpty)
+                      ? item.mappedOutgoingAccountName!.trim()
+                      : 'Account';
+                  final inAcc = (item.mappedIncomingAccountName != null && item.mappedIncomingAccountName!.trim().isNotEmpty)
+                      ? item.mappedIncomingAccountName!.trim()
+                      : 'Account';
+                  mainLabel = '$outAcc → $inAcc';
+                } else {
+                  final cat = (item.mappedCategoryName != null && item.mappedCategoryName!.trim().isNotEmpty)
+                      ? item.mappedCategoryName!.trim()
+                      : 'No category';
+                  final acc = (item.mappedAccountName != null && item.mappedAccountName!.trim().isNotEmpty)
+                      ? item.mappedAccountName!.trim()
+                      : 'No account';
+                  mainLabel = '$cat • $acc';
+                }
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: AppCard(
@@ -1739,29 +1955,38 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                item.sheetType == ExcelSheetType.transfers
-                                    ? '${item.mappedOutgoingAccountName} → ${item.mappedIncomingAccountName}'
-                                    : '${item.mappedCategoryName ?? "Category"} • ${item.mappedAccountName ?? "Account"}',
-                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                                mainLabel,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 DateFormat('dd MMM yyyy').format(item.date),
-                                style: const TextStyle(fontSize: 11, color: AppColors.lightTextSecondary),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                ),
                               ),
                               if (item.comment != null && item.comment!.trim().isNotEmpty) ...[
                                 const SizedBox(height: 3),
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(Icons.comment_outlined, size: 12, color: AppColors.primary),
+                                    const Icon(Icons.comment_rounded, size: 12, color: AppColors.primary),
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
                                         item.comment!.trim(),
-                                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.lightTextPrimary),
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                        ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1776,7 +2001,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                         // Neutral Amount display
                         Text(
                           item.amount.format(),
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.lightTextPrimary),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                          ),
                         ),
                       ],
                     ),
@@ -1790,9 +2019,9 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
         // Bottom Action buttons: Backup & Import + Import Now
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: AppColors.lightSurface,
-            border: Border(top: BorderSide(color: AppColors.lightBorder)),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurface,
+            border: Border(top: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1804,7 +2033,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                icon: const Icon(Icons.shield_outlined, size: 20),
+                icon: const Icon(Icons.shield_rounded, size: 20),
                 label: Text(
                   'Backup & Import ($validCount Transactions)',
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
@@ -1814,9 +2043,13 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => provider.executeImport(createBackupFirst: false),
-                child: const Text(
+                child: Text(
                   'Import Without Backup',
-                  style: TextStyle(fontSize: 13, color: AppColors.lightTextSecondary, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -1827,6 +2060,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
   }
 
   Widget _buildImportResult(BuildContext context, ExcelImportProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final result = provider.lastResult;
     if (result == null) return const Center(child: Text('No import result available.'));
 
@@ -1857,7 +2091,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
         Text(
           result.isSuccess ? 'Import Completed Successfully' : 'Import Incomplete / Failed',
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.lightTextPrimary),
+          style: TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -1865,7 +2103,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
               ? 'All selected records have been imported and reconciled safely into Kals Money Manager.'
               : (result.errorMessage ?? 'Some records could not be imported.'),
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, color: AppColors.lightTextSecondary, height: 1.4),
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 20),
 
@@ -1901,7 +2143,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                     ),
                     child: Text(
                       isReconciled ? 'PASS' : 'FAIL',
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: isReconciled ? AppColors.income : AppColors.expense),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: isReconciled ? AppColors.income : AppColors.expense,
+                      ),
                     ),
                   ),
                 ],
@@ -1909,7 +2155,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
               const SizedBox(height: 8),
               Text(
                 'Source (${result.totalSourceRows}) = Imported (${result.importedCount}) + Duplicates (${result.skippedDuplicates}) + Invalid (${result.invalidRowsCount}) + Failed (${result.failedCount})',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.lightTextPrimary),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                ),
               ),
             ],
           ),
@@ -1923,13 +2173,18 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.primary),
-                    SizedBox(width: 8),
+                    const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.primary),
+                    const SizedBox(width: 8),
                     Text(
                       'MONTHLY RECONCILIATION',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.lightTextSecondary, letterSpacing: 0.5),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ],
                 ),
@@ -1947,7 +2202,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                       children: [
                         Text(
                           mKey,
-                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.lightTextPrimary),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                          ),
                         ),
                         Row(
                           children: [
@@ -1956,7 +2215,9 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w700,
-                                color: isMonthPass ? AppColors.lightTextPrimary : AppColors.expense,
+                                color: isMonthPass
+                                    ? (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)
+                                    : AppColors.expense,
                               ),
                             ),
                             const SizedBox(width: 6),
@@ -1982,23 +2243,23 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              _buildResultRow('Source Rows Scanned', '${result.totalSourceRows}', AppColors.lightTextPrimary),
-              const Divider(height: 16),
-              _buildResultRow('Transactions Imported', '${result.importedCount}', AppColors.income),
-              const Divider(height: 16),
-              _buildResultRow('Expenses Imported', '${result.expensesImported}', AppColors.lightTextPrimary),
-              const Divider(height: 16),
-              _buildResultRow('Income Imported', '${result.incomeImported}', AppColors.lightTextPrimary),
-              const Divider(height: 16),
-              _buildResultRow('Transfers Imported', '${result.transfersImported}', AppColors.lightTextPrimary),
-              const Divider(height: 16),
-              _buildResultRow('Skipped as Duplicates', '${result.skippedDuplicates}', const Color(0xFFD97706)),
-              const Divider(height: 16),
-              _buildResultRow('Invalid Rows Skipped', '${result.invalidRowsCount}', result.invalidRowsCount > 0 ? AppColors.expense : AppColors.lightTextSecondary),
-              const Divider(height: 16),
-              _buildResultRow('Accounts Mapped', '${result.accountsMappedCount}', AppColors.primary),
-              const Divider(height: 16),
-              _buildResultRow('Categories Mapped', '${result.categoriesMappedCount}', AppColors.primary),
+              _buildResultRow(context, 'Source Rows Scanned', '${result.totalSourceRows}', isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+              Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 16),
+              _buildResultRow(context, 'Transactions Imported', '${result.importedCount}', AppColors.income),
+              Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 16),
+              _buildResultRow(context, 'Expenses Imported', '${result.expensesImported}', isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+              Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 16),
+              _buildResultRow(context, 'Income Imported', '${result.incomeImported}', isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+              Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 16),
+              _buildResultRow(context, 'Transfers Imported', '${result.transfersImported}', isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+              Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 16),
+              _buildResultRow(context, 'Skipped as Duplicates', '${result.skippedDuplicates}', const Color(0xFFD97706)),
+              Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 16),
+              _buildResultRow(context, 'Invalid Rows Skipped', '${result.invalidRowsCount}', result.invalidRowsCount > 0 ? AppColors.expense : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+              Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 16),
+              _buildResultRow(context, 'Accounts Mapped', '${result.accountsMappedCount}', AppColors.primary),
+              Divider(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, height: 16),
+              _buildResultRow(context, 'Categories Mapped', '${result.categoriesMappedCount}', AppColors.primary),
             ],
           ),
         ),
@@ -2043,13 +2304,14 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
     );
   }
 
-  Widget _buildStatBox(String label, String value, Color color) {
+  Widget _buildStatBox(BuildContext context, String label, String value, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.lightSurface,
+        color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.lightBorder),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
       ),
       child: Column(
         children: [
@@ -2060,7 +2322,11 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: AppColors.lightTextSecondary, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              fontWeight: FontWeight.w600,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -2068,37 +2334,71 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
     );
   }
 
-  Widget _buildBreakdownItem(String label, String count, Color color) {
+  Widget _buildBreakdownItem(BuildContext context, String label, String count, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         Text(count, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 11.5, color: AppColors.lightTextSecondary, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildResultRow(String label, String value, Color color) {
+  Widget _buildResultRow(BuildContext context, String label, String value, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.lightTextSecondary, fontWeight: FontWeight.w500)),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
       ],
     );
   }
 
-  Widget _buildColumnMappingRow(String legacyCol, String kalsField) {
+  Widget _buildColumnMappingRow(BuildContext context, String legacyCol, String kalsField) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(legacyCol, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.lightTextPrimary)),
+          Expanded(
+            child: Text(
+              legacyCol,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.lightTextSecondary),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: 12,
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              ),
               const SizedBox(width: 6),
               Text(
                 kalsField,

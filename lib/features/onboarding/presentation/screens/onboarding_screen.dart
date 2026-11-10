@@ -1,7 +1,10 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_currency.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/id_generator.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/app_card.dart';
@@ -9,7 +12,13 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/currency_picker_dialog.dart';
 import '../../../accounts/domain/entities/account.dart';
 import '../../../accounts/presentation/providers/account_provider.dart';
+import '../../../backup/presentation/providers/backup_provider.dart';
+import '../../../categories/presentation/providers/category_provider.dart';
+import '../../../recurring/presentation/providers/recurring_provider.dart';
+import '../../../reminders/presentation/providers/reminder_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
+import '../../../transactions/presentation/providers/transaction_provider.dart';
+import '../../../transfers/presentation/providers/transfer_provider.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -42,9 +51,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_currentPage == 1) {
       final name = _nameController.text.trim();
       if (name.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter your name.')),
-        );
+        AppSnackBar.showError(context, 'Please enter your name.');
         return;
       }
     }
@@ -52,9 +59,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_currentPage == 3) {
       final accountName = _accountNameController.text.trim();
       if (accountName.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter an account name.')),
-        );
+        AppSnackBar.showError(context, 'Please enter an account name.');
         return;
       }
     }
@@ -107,9 +112,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       settings.setOnboardingCompleted(true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error completing setup: $e')),
-        );
+        AppSnackBar.showError(context, 'Error completing setup: $e');
       }
     } finally {
       if (mounted) setState(() => _isFinishing = false);
@@ -210,6 +213,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  Future<void> _handleRestoreFromBackup() async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(type: FileType.any);
+      if (result.isEmpty || result.first.path == null) return;
+
+      final file = File(result.first.path!);
+      if (!mounted) return;
+
+      final backupProvider = context.read<BackupProvider>();
+      final success = await backupProvider.restoreFromFile(file);
+      if (!mounted) return;
+
+      if (success) {
+        // Refresh all providers
+        context.read<AccountProvider>().loadAccounts();
+        context.read<CategoryProvider>().loadCategories();
+        context.read<TransactionProvider>().loadLedger();
+        context.read<TransferProvider>().loadTransfers();
+        context.read<RecurringProvider>().loadRecurring();
+        context.read<ReminderProvider>().loadReminders(rescheduleAlarms: true);
+        if (!mounted) return;
+        await context.read<SettingsProvider>().loadSettings();
+        if (!mounted) return;
+        context.read<SettingsProvider>().setOnboardingCompleted(true);
+      } else {
+        AppSnackBar.showError(context, backupProvider.errorMessage ?? 'Restore failed');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Error restoring: $e');
+      }
+    }
+  }
+
   // 1. Welcome Slide
   Widget _buildWelcomeStep(bool isDark) {
     return Padding(
@@ -253,6 +290,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               height: 1.45,
             ),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 28),
+          TextButton.icon(
+            onPressed: _handleRestoreFromBackup,
+            icon: const Icon(Icons.restore_page_rounded, size: 20),
+            label: const Text(
+              'Have an existing backup? Restore',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -413,7 +459,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   label: 'ACCOUNT NAME',
                   controller: _accountNameController,
                   hintText: 'e.g. Main Account',
-                  prefixIcon: const Icon(Icons.account_balance_outlined),
+                  prefixIcon: const Icon(Icons.account_balance_rounded),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 16),
@@ -510,10 +556,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _summaryRow(bool isDark, String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary, fontWeight: FontWeight.w600)),
-        Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+          ),
+        ),
       ],
     );
   }

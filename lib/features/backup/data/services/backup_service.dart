@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
-import 'package:path/path.dart' as p;
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/tables.dart';
@@ -162,19 +161,11 @@ class BackupService {
     final now = DateTime.now();
     final fileName = 'MoneyManager_Backup_${DateFormatter.formatBackupStamp(now)}${AppConstants.backupFileExtension}';
 
-    final backupDir = await StorageHelper.getDownloadsDirectory();
-    if (!await backupDir.exists()) {
-      await backupDir.create(recursive: true);
-    }
-
-    final file = File(p.join(backupDir.path, fileName));
-    await file.writeAsString(jsonStr, flush: true);
-
-    // Verify file creation and non-zero size
-    final isValid = await StorageHelper.verifyFileExistsAndNonEmpty(file);
-    if (!isValid) {
-      throw Exception('Backup failed: file could not be verified in storage');
-    }
+    final file = await StorageHelper.saveToPublicDownloads(
+      bytes: utf8.encode(jsonStr),
+      fileName: fileName,
+      mimeType: 'application/octet-stream',
+    );
 
     return file;
   }

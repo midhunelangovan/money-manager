@@ -109,7 +109,7 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      backgroundColor: isDark ? const Color(0xFF16202E) : Colors.white,
+      backgroundColor: isDark ? AppColors.darkSurfaceCard : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -120,7 +120,7 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F1722) : AppColors.lightSurfaceElevated,
+                color: isDark ? AppColors.darkInputSurface : AppColors.lightSurfaceElevated,
                 borderRadius: BorderRadius.circular(16),
               ),
               alignment: Alignment.centerRight,
@@ -196,7 +196,7 @@ class _CalculatorDialogState extends State<CalculatorDialog> {
     final btnBg = color?.withValues(alpha: 0.15) ??
         (isOp
             ? AppColors.primary.withValues(alpha: 0.12)
-            : (isDark ? const Color(0xFF222F42) : const Color(0xFFF1F5F4)));
+            : (isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated));
     final btnTextColor = color ??
         (isOp
             ? AppColors.primary

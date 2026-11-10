@@ -67,6 +67,8 @@ class RecurringTransaction {
   final DateTime? endDate;
   final DateTime nextExecutionDate;
   final bool isActive;
+  final bool remindMe;
+  final int reminderLeadDays; // 0: on due date, 1: 1 day before, 3: 3 days before, 7: 7 days before
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -89,6 +91,8 @@ class RecurringTransaction {
     this.endDate,
     required this.nextExecutionDate,
     this.isActive = true,
+    this.remindMe = false,
+    this.reminderLeadDays = 0,
     required this.createdAt,
     required this.updatedAt,
     this.accountName,
@@ -110,6 +114,8 @@ class RecurringTransaction {
     DateTime? endDate,
     DateTime? nextExecutionDate,
     bool? isActive,
+    bool? remindMe,
+    int? reminderLeadDays,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? accountName,
@@ -130,6 +136,8 @@ class RecurringTransaction {
       endDate: endDate ?? this.endDate,
       nextExecutionDate: nextExecutionDate ?? this.nextExecutionDate,
       isActive: isActive ?? this.isActive,
+      remindMe: remindMe ?? this.remindMe,
+      reminderLeadDays: reminderLeadDays ?? this.reminderLeadDays,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       accountName: accountName ?? this.accountName,

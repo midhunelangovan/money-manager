@@ -6,11 +6,15 @@ import 'package:kals_money_manager/core/services/notification_service.dart';
 import 'package:kals_money_manager/features/reminders/data/repositories/reminder_repository.dart';
 import 'package:kals_money_manager/features/reminders/domain/entities/reminder.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('UTC'));
   });
 
   group('Reminder Entity & Serialization Tests', () {
@@ -75,6 +79,9 @@ void main() {
 
       expect(ReminderFrequency.daily.displayName, 'Every day');
       expect(ReminderFrequency.daily.shortName, 'Daily');
+      expect(ReminderFrequency.weekly.displayName, 'Every week');
+      expect(ReminderFrequency.monthly.displayName, 'Every month');
+      expect(ReminderFrequency.yearly.displayName, 'Every year');
     });
   });
 
@@ -145,7 +152,111 @@ void main() {
     });
   });
 
-  group('Reminder Notification Service Logic Tests', () {
+  group('Reminder Notification Trigger Calculation & Frequency Matrix', () {
+    final notificationService = NotificationService();
+
+    test('Daily reminder: Schedules for today if time is future, tomorrow if passed', () {
+      final now = tz.TZDateTime(tz.local, 2026, 10, 15, 12, 0); // 12:00 PM
+
+      // Future today (21:30)
+      final dailyFuture = Reminder(
+        id: 'daily_1',
+        name: 'Add payments',
+        frequency: ReminderFrequency.daily,
+        date: DateTime(2026, 10, 15),
+        time: const TimeOfDay(hour: 21, minute: 30),
+        createdAt: DateTime(2026, 10, 15),
+        updatedAt: DateTime(2026, 10, 15),
+      );
+      final nextFuture = notificationService.calculateNextTrigger(dailyFuture, now);
+      expect(nextFuture.year, 2026);
+      expect(nextFuture.month, 10);
+      expect(nextFuture.day, 15);
+      expect(nextFuture.hour, 21);
+      expect(nextFuture.minute, 30);
+
+      // Passed today (09:00) -> Schedules for tomorrow
+      final dailyPassed = Reminder(
+        id: 'daily_2',
+        name: 'Morning routine',
+        frequency: ReminderFrequency.daily,
+        date: DateTime(2026, 10, 15),
+        time: const TimeOfDay(hour: 9, minute: 0),
+        createdAt: DateTime(2026, 10, 15),
+        updatedAt: DateTime(2026, 10, 15),
+      );
+      final nextTomorrow = notificationService.calculateNextTrigger(dailyPassed, now);
+      expect(nextTomorrow.year, 2026);
+      expect(nextTomorrow.month, 10);
+      expect(nextTomorrow.day, 16);
+      expect(nextTomorrow.hour, 9);
+      expect(nextTomorrow.minute, 0);
+    });
+
+    test('Weekly reminder: Fires on the exact selected weekday (e.g. Every Monday)', () {
+      // Thursday, Oct 15, 2026 (weekday = 4)
+      final now = tz.TZDateTime(tz.local, 2026, 10, 15, 12, 0);
+
+      // Target Monday (weekday = 1) -> Should schedule for Monday Oct 19, 2026
+      final weeklyMonday = Reminder(
+        id: 'weekly_mon',
+        name: 'Weekly review',
+        frequency: ReminderFrequency.weekly,
+        date: DateTime(2026, 10, 19), // A Monday
+        time: const TimeOfDay(hour: 21, minute: 30),
+        createdAt: DateTime(2026, 10, 15),
+        updatedAt: DateTime(2026, 10, 15),
+      );
+      final nextMon = notificationService.calculateNextTrigger(weeklyMonday, now);
+      expect(nextMon.weekday, DateTime.monday);
+      expect(nextMon.day, 19);
+      expect(nextMon.hour, 21);
+      expect(nextMon.minute, 30);
+    });
+
+    test('Monthly reminder: Handles 29th, 30th, 31st with month-end clamping', () {
+      // Jan 31, 2026 at 22:00 -> passed 21:30 time for today
+      final nowJan31Passed = tz.TZDateTime(tz.local, 2026, 1, 31, 22, 0);
+
+      final monthly31 = Reminder(
+        id: 'monthly_31',
+        name: 'End of month audit',
+        frequency: ReminderFrequency.monthly,
+        date: DateTime(2026, 1, 31),
+        time: const TimeOfDay(hour: 21, minute: 30),
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      );
+
+      // Next occurrence after Jan 31 is in February (which only has 28 days in 2026)
+      final nextFeb = notificationService.calculateNextTrigger(monthly31, nowJan31Passed);
+      expect(nextFeb.year, 2026);
+      expect(nextFeb.month, 2);
+      expect(nextFeb.day, 28); // Clamped to Feb 28
+      expect(nextFeb.hour, 21);
+      expect(nextFeb.minute, 30);
+    });
+
+    test('Once reminder: Schedules exact date and time', () {
+      final now = tz.TZDateTime(tz.local, 2026, 10, 1, 10, 0);
+      final onceRem = Reminder(
+        id: 'once_target',
+        name: 'Dentist Appointment',
+        frequency: ReminderFrequency.once,
+        date: DateTime(2026, 10, 28),
+        time: const TimeOfDay(hour: 14, minute: 15),
+        createdAt: DateTime(2026, 10, 1),
+        updatedAt: DateTime(2026, 10, 1),
+      );
+
+      final next = notificationService.calculateNextTrigger(onceRem, now);
+      expect(next.year, 2026);
+      expect(next.month, 10);
+      expect(next.day, 28);
+      expect(next.hour, 14);
+      expect(next.minute, 15);
+    });
+
     test('NotificationService.getNotificationId produces deterministic positive 31-bit integer hash', () {
       const id1 = 'reminder-uuid-abc-123';
       const id2 = 'reminder-uuid-abc-123';

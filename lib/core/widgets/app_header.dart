@@ -10,6 +10,11 @@ class AppHeader extends StatelessWidget {
   final Widget? bottom;
   final double? bottomHeight;
   final bool showBackButton;
+  final bool centerTitle;
+  final Color? backgroundColor;
+  final BorderRadius? borderRadius;
+  final EdgeInsetsGeometry? padding;
+  final List<BoxShadow>? boxShadow;
 
   const AppHeader({
     super.key,
@@ -20,6 +25,11 @@ class AppHeader extends StatelessWidget {
     this.bottom,
     this.bottomHeight,
     this.showBackButton = true,
+    this.centerTitle = true,
+    this.backgroundColor,
+    this.borderRadius,
+    this.padding,
+    this.boxShadow,
   });
 
   @override
@@ -27,67 +37,72 @@ class AppHeader extends StatelessWidget {
     final topPadding = MediaQuery.of(context).padding.top;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final headerColor = isDark ? AppColors.darkSurface : theme.colorScheme.primary;
+    final headerColor = backgroundColor ?? (isDark ? AppColors.darkSurface : theme.colorScheme.primary);
 
     return Container(
       decoration: BoxDecoration(
         color: headerColor,
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(24),
-        ),
-        border: isDark ? const Border(bottom: BorderSide(color: AppColors.darkBorderSubtle)) : null,
-        boxShadow: [
+        borderRadius: borderRadius ??
+            const BorderRadius.vertical(
+              bottom: Radius.circular(28),
+            ),
+        border: (backgroundColor == null && isDark) ? const Border(bottom: BorderSide(color: AppColors.darkBorderSubtle)) : null,
+        boxShadow: boxShadow ?? [
           BoxShadow(
-            color: isDark ? Colors.black.withValues(alpha: 0.25) : headerColor.withValues(alpha: 0.18),
-            blurRadius: 10,
+            color: isDark ? Colors.black.withValues(alpha: 0.25) : headerColor.withValues(alpha: 0.22),
+            blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: EdgeInsets.only(
-        top: topPadding + 8,
-        left: 16,
-        right: 16,
-        bottom: bottom != null ? 16 : 14,
-      ),
+      padding: padding ??
+          EdgeInsets.only(
+            top: topPadding + 8,
+            left: 16,
+            right: 16,
+            bottom: bottom != null ? 14 : 16,
+          ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              if (leading != null)
-                leading!
-              else if (showBackButton && Navigator.canPop(context))
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                  tooltip: 'Back',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                )
-              else
-                const SizedBox(width: 4),
-
-              Expanded(
-                child: titleWidget ??
-                    Text(
+          SizedBox(
+            height: 44,
+            child: NavigationToolbar(
+              leading: leading ??
+                  ((showBackButton && Navigator.canPop(context))
+                      ? IconButton(
+                          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                          onPressed: () => Navigator.maybePop(context),
+                          tooltip: 'Back',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                        )
+                      : null),
+              middle: titleWidget ??
+                  Padding(
+                    padding: EdgeInsets.only(left: centerTitle ? 0 : 8),
+                    child: Text(
                       title ?? '',
                       style: AppTypography.headlineMedium.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
+                        fontSize: 22,
                       ),
-                      textAlign: TextAlign.center,
+                      textAlign: centerTitle ? TextAlign.center : TextAlign.start,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-              ),
-
-              if (actions != null)
-                Row(mainAxisSize: MainAxisSize.min, children: actions!)
-              else
-                const SizedBox(width: 40),
-            ],
+                  ),
+              trailing: actions != null
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: actions!,
+                    )
+                  : null,
+              centerMiddle: centerTitle,
+            ),
           ),
 
           if (bottom != null) ...[

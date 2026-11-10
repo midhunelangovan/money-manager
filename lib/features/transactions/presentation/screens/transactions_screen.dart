@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/navigation/navigation_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/widgets/app_drawer.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_text_field.dart';
@@ -10,6 +11,7 @@ import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/export_action_dialog.dart';
 import '../../../accounts/presentation/providers/account_provider.dart';
 import '../../../categories/presentation/providers/category_provider.dart';
+import '../../../transfers/presentation/providers/transfer_provider.dart';
 import '../../domain/entities/transaction.dart';
 import '../../domain/repositories/transaction_repository.dart';
 import '../providers/transaction_provider.dart';
@@ -656,7 +658,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             title: 'Transactions',
             actions: [
               IconButton(
-                icon: const Icon(Icons.file_download_outlined, color: Colors.white),
+                icon: const Icon(Icons.file_download_rounded, color: Colors.white),
                 tooltip: 'Export to Excel',
                 onPressed: () {
                   ExportActionDialog.show(
@@ -784,6 +786,27 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                                       context.read<AccountProvider>().loadAccounts(),
                                       context.read<TransactionProvider>().loadLedger(),
                                     ]);
+                                  }
+                                },
+                                onDelete: () async {
+                                  try {
+                                    if (item.type == LedgerItemType.transfer) {
+                                      await context.read<TransferProvider>().deleteTransfer(item.id);
+                                    } else {
+                                      await context.read<TransactionProvider>().deleteTransaction(item.id);
+                                    }
+                                    if (context.mounted) {
+                                      await Future.wait([
+                                        context.read<AccountProvider>().loadAccounts(),
+                                        context.read<TransactionProvider>().loadLedger(),
+                                      ]);
+                                      final label = item.type == LedgerItemType.transfer ? 'Transfer' : 'Transaction';
+                                      AppSnackBar.showSuccess(context, '$label deleted successfully.');
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      AppSnackBar.showError(context, 'Failed to delete: $e');
+                                    }
                                   }
                                 },
                               );

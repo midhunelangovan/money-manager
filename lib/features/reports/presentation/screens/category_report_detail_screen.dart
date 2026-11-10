@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/date_formatter.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_category_icon.dart';
 import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/widgets/empty_state.dart';
+import '../../../accounts/presentation/providers/account_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../transactions/domain/entities/transaction.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
+import '../../../transactions/presentation/screens/add_edit_transaction_screen.dart';
 
 class CategoryReportDetailScreen extends StatefulWidget {
   final String categoryId;
@@ -118,18 +123,13 @@ class _CategoryReportDetailScreenState extends State<CategoryReportDetailScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: widget.categoryColor.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: widget.categoryColor.withValues(alpha: 0.6),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Icon(widget.categoryIcon, color: Colors.white, size: 22),
+                    AppCategoryIcon(
+                      icon: widget.categoryIcon,
+                      color: Colors.white,
+                      backgroundColor: widget.categoryColor.withValues(alpha: 0.3),
+                      size: 44,
+                      iconSize: 24,
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -184,7 +184,7 @@ class _CategoryReportDetailScreenState extends State<CategoryReportDetailScreen>
                       )
                     : (_transactions.isEmpty
                         ? EmptyState(
-                            icon: Icons.receipt_long_outlined,
+                            icon: Icons.receipt_long_rounded,
                             title: 'No Transactions Found',
                             subtitle: 'No transactions found for ${widget.categoryName} in ${widget.periodTitle}.',
                           )
@@ -201,79 +201,158 @@ class _CategoryReportDetailScreenState extends State<CategoryReportDetailScreen>
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: AppCard(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    child: Row(
-                                      children: [
-                                        // Date Column
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE8EEF5),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            dateStr,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                              color: isDark ? AppColors.darkTextSecondary : AppColors.primary,
-                                            ),
+                                    onTap: () async {
+                                      final changed = await Navigator.of(context).push<bool>(
+                                        MaterialPageRoute(
+                                          builder: (_) => AddEditTransactionScreen(transaction: tx),
+                                        ),
+                                      );
+                                      if (changed == true && mounted) {
+                                        await _loadTransactions();
+                                      }
+                                    },
+                                    onLongPress: () async {
+                                      final action = await showModalBottomSheet<String>(
+                                        context: context,
+                                        backgroundColor: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard,
+                                        shape: const RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                        ),
+                                        builder: (ctx) => SafeArea(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const SizedBox(height: 8),
+                                              Container(
+                                                width: 36,
+                                                height: 4,
+                                                decoration: BoxDecoration(
+                                                  color: isDark ? Colors.white24 : Colors.black12,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              ListTile(
+                                                leading: const Icon(Icons.edit_rounded),
+                                                title: const Text('Edit Transaction'),
+                                                onTap: () => Navigator.pop(ctx, 'edit'),
+                                              ),
+                                              ListTile(
+                                                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.expense),
+                                                title: const Text('Delete Transaction', style: TextStyle(color: AppColors.expense)),
+                                                onTap: () => Navigator.pop(ctx, 'delete'),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
+                                      );
 
-                                        // Details Column
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                tx.description.isNotEmpty ? tx.description : widget.categoryName,
-                                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                      if (action == 'edit' && mounted) {
+                                        final changed = await Navigator.of(context).push<bool>(
+                                          MaterialPageRoute(
+                                            builder: (_) => AddEditTransactionScreen(transaction: tx),
+                                          ),
+                                        );
+                                        if (changed == true && mounted) {
+                                          await _loadTransactions();
+                                        }
+                                      } else if (action == 'delete' && mounted) {
+                                        final confirmed = await TransactionDeleteConfirmationDialog.show(
+                                          context,
+                                          amount: Money.fromUnits(tx.amountUnits),
+                                          accountName: tx.accountName ?? 'Account',
+                                          categoryName: widget.categoryName,
+                                          date: tx.date,
+                                          description: tx.description,
+                                        );
+                                        if (confirmed == true && mounted) {
+                                          try {
+                                            await context.read<TransactionProvider>().deleteTransaction(tx.id);
+                                            await context.read<AccountProvider>().loadAccounts();
+                                            await _loadTransactions();
+                                            if (mounted) {
+                                              AppSnackBar.showSuccess(context, 'Transaction deleted successfully.');
+                                            }
+                                          } catch (e) {
+                                            if (mounted) {
+                                              AppSnackBar.showError(context, 'Failed to delete transaction: $e');
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      child: Row(
+                                        children: [
+                                          // Date Column
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSelectedBackground,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              dateStr,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: isDark ? AppColors.darkTextSecondary : AppColors.primary,
                                               ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                tx.accountName ?? 'Account',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                                                  fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+
+                                          // Details Column
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  tx.description.isNotEmpty ? tx.description : widget.categoryName,
+                                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              if (tx.notes != null && tx.notes!.trim().isNotEmpty) ...[
                                                 const SizedBox(height: 2),
                                                 Text(
-                                                  tx.notes!,
+                                                  tx.accountName ?? 'Account',
                                                   style: TextStyle(
-                                                    fontSize: 11,
-                                                    fontStyle: FontStyle.italic,
-                                                    color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+                                                    fontSize: 12,
+                                                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                                    fontWeight: FontWeight.w500,
                                                   ),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
+                                                if (tx.notes != null && tx.notes!.trim().isNotEmpty) ...[
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    tx.notes!,
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontStyle: FontStyle.italic,
+                                                      color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ],
                                               ],
-                                            ],
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
+                                          const SizedBox(width: 8),
 
-                                        // Neutral Amount
-                                        Text(
-                                          amountFormatted,
-                                          style: AppTypography.amountMedium.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                          // Neutral Amount
+                                          Text(
+                                            amountFormatted,
+                                            style: AppTypography.amountMedium.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                );
+                                  );
                               },
                             ),
                           ))),

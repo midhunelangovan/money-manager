@@ -117,7 +117,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                           context: context,
                           title: 'Light Theme',
                           subtitle: 'Warm off-white matte background with navy headers',
-                          icon: Icons.light_mode_outlined,
+                          icon: Icons.light_mode_rounded,
                           mode: ThemeMode.light,
                           currentMode: settings.themeMode,
                           onSelect: (m) => settings.setThemeMode(m),
@@ -127,7 +127,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                           context: context,
                           title: 'Dark Theme',
                           subtitle: 'Deep midnight slate surface for low light',
-                          icon: Icons.dark_mode_outlined,
+                          icon: Icons.dark_mode_rounded,
                           mode: ThemeMode.dark,
                           currentMode: settings.themeMode,
                           onSelect: (m) => settings.setThemeMode(m),
@@ -137,7 +137,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                           context: context,
                           title: 'System Default',
                           subtitle: 'Follow your device system theme settings',
-                          icon: Icons.brightness_auto_outlined,
+                          icon: Icons.brightness_auto_rounded,
                           mode: ThemeMode.system,
                           currentMode: settings.themeMode,
                           onSelect: (m) => settings.setThemeMode(m),
@@ -147,7 +147,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Application Accent Color',
+                    'Design System',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -158,57 +158,42 @@ class AppearanceSettingsScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   AppCard(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Accent Color Palette',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
                           ),
+                          child: const Icon(Icons.palette_rounded, color: AppColors.primary, size: 22),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Select your preferred accent tint for highlights and primary buttons.',
-                          style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: AppAccentColor.values.map((accent) {
-                            final isSelected = settings.accentColor == accent;
-                            return InkWell(
-                              onTap: () => settings.setAccentColor(accent),
-                              borderRadius: BorderRadius.circular(24),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: accent.primary,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSelected ? (isDark ? Colors.white : Colors.black87) : Colors.transparent,
-                                    width: 3,
-                                  ),
-                                  boxShadow: isSelected
-                                      ? [
-                                          BoxShadow(
-                                            color: accent.primary.withValues(alpha: 0.4),
-                                            blurRadius: 8,
-                                            spreadRadius: 2,
-                                          )
-                                        ]
-                                      : null,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Kals Unified Theme',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                                 ),
-                                child: isSelected
-                                    ? const Icon(Icons.check_rounded, color: Colors.white, size: 22)
-                                    : null,
                               ),
-                            );
-                          }).toList(),
+                              const SizedBox(height: 4),
+                              Text(
+                                'A single, restrained Slate Navy & Warm Neutral aesthetic engineered for clarity, readability, and dependability across all accounts and reports.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.4,
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

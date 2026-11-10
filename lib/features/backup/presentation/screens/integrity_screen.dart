@@ -156,17 +156,17 @@ class _IntegrityScreenState extends State<IntegrityScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141C2B) : Colors.white,
+        color: isDark ? AppColors.darkSurfaceCard : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? const Color(0xFF202C3F) : const Color(0xFFE2E8F0),
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            item.isValid ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+            item.isValid ? Icons.check_circle_outline_rounded : Icons.cancel_rounded,
             color: item.isValid ? AppColors.income : AppColors.expense,
             size: 22,
           ),

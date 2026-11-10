@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/extensions/date_extensions.dart';
 import '../../../../core/navigation/navigation_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utilities/money.dart';
-import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/donut_chart.dart';
 import '../../../../core/widgets/period_selector.dart';
@@ -13,6 +11,7 @@ import '../../../../core/widgets/transaction_type_tabs.dart';
 import '../../../accounts/domain/entities/account.dart';
 import '../../../accounts/presentation/providers/account_provider.dart';
 import '../../../accounts/presentation/widgets/edit_account_balance_dialog.dart';
+import '../../../../core/widgets/export_bottom_sheet.dart';
 import '../../../categories/domain/entities/category.dart';
 import '../../../categories/presentation/providers/category_provider.dart';
 import '../../../categories/presentation/screens/category_transactions_screen.dart';
@@ -20,7 +19,8 @@ import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../transactions/domain/entities/transaction.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/presentation/screens/add_edit_transaction_screen.dart';
-import '../../../transactions/presentation/screens/transactions_screen.dart';
+import '../../../transactions/presentation/screens/period_transactions_screen.dart';
+import '../models/dashboard_filter_state.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -30,138 +30,340 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  LedgerTabType? _selectedTab;
-  TimePeriod? _selectedPeriod;
-  late DateTime _selectedHomeDate;
-  String? _sessionAccountId; // null means follow settings, '__ALL__' means all, or specific ID
+  DashboardFilterState? _filterState;
+  List<LedgerItem> _periodItems = [];
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  int _queryToken = 0;
+  int _lastLedgerRevision = -1;
+  bool _hasResolvedInitialAccount = false;
+  DashboardFocusMode? _lastKnownFocus;
+  String? _lastKnownSelectedAccountId;
 
   @override
   void initState() {
     super.initState();
+    MainNavigationService.currentTabNotifier.addListener(_onTabNavigated);
+    final settings = context.read<SettingsProvider>();
+    final accountProvider = context.read<AccountProvider>();
+
+    _lastKnownFocus = settings.dashboardFocus;
+    _lastKnownSelectedAccountId = settings.dashboardSelectedAccountId;
+
+    if (accountProvider.accountsWithBalances.isEmpty && !accountProvider.isLoading) {
+      accountProvider.loadAccounts();
+    }
+
+    String? initialAccountId;
+    switch (settings.dashboardFocus) {
+      case DashboardFocusMode.allAccounts:
+        initialAccountId = null;
+        break;
+      case DashboardFocusMode.selectedAccount:
+        initialAccountId = settings.dashboardSelectedAccountId ?? settings.primaryAccountId;
+        break;
+      case DashboardFocusMode.primaryAccount:
+        initialAccountId = settings.primaryAccountId ??
+            (accountProvider.accountsWithBalances.isNotEmpty
+                ? accountProvider.accountsWithBalances.first.account.id
+                : null);
+        break;
+    }
+
+    _hasResolvedInitialAccount = (initialAccountId != null) || (settings.dashboardFocus == DashboardFocusMode.allAccounts);
+
     final now = DateTime.now();
-    _selectedHomeDate = DateTime(now.year, now.month, now.day);
-  }
-
-  TimePeriod _effectivePeriod(SettingsProvider settings) {
-    return _selectedPeriod ?? settings.defaultPeriod;
-  }
-
-  LedgerTabType _effectiveTab(SettingsProvider settings) {
-    return _selectedTab ?? settings.defaultTransactionType;
-  }
-
-  // Accurate Date Range calculation for selected period using LOCAL boundaries [start, end)
-  DateTime _periodStartDate(TimePeriod period) {
-    switch (period) {
-      case TimePeriod.day:
-        return DateTime(_selectedHomeDate.year, _selectedHomeDate.month, _selectedHomeDate.day, 0, 0, 0, 0);
-      case TimePeriod.week:
-        return _selectedHomeDate.startOfWeek;
-      case TimePeriod.month:
-        return DateTime(_selectedHomeDate.year, _selectedHomeDate.month, 1, 0, 0, 0, 0);
-      case TimePeriod.year:
-        return DateTime(_selectedHomeDate.year, 1, 1, 0, 0, 0, 0);
-      case TimePeriod.period:
-        return DateTime(_selectedHomeDate.year, _selectedHomeDate.month, 1, 0, 0, 0, 0);
-    }
-  }
-
-  DateTime _periodEndDate(TimePeriod period) {
-    switch (period) {
-      case TimePeriod.day:
-        return DateTime(_selectedHomeDate.year, _selectedHomeDate.month, _selectedHomeDate.day + 1, 0, 0, 0, 0);
-      case TimePeriod.week:
-        return _selectedHomeDate.startOfWeek.add(const Duration(days: 7));
-      case TimePeriod.month:
-        return DateTime(_selectedHomeDate.year, _selectedHomeDate.month + 1, 1, 0, 0, 0, 0);
-      case TimePeriod.year:
-        return DateTime(_selectedHomeDate.year + 1, 1, 1, 0, 0, 0, 0);
-      case TimePeriod.period:
-        return DateTime(_selectedHomeDate.year, _selectedHomeDate.month + 1, 1, 0, 0, 0, 0);
-    }
-  }
-
-  String _periodLabel(TimePeriod period) {
-    final start = _periodStartDate(period);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-    switch (period) {
-      case TimePeriod.day:
-        final dayName = daysOfWeek[_selectedHomeDate.weekday - 1];
-        return '${_selectedHomeDate.day.toString().padLeft(2, '0')} ${months[_selectedHomeDate.month - 1]} ${_selectedHomeDate.year} ($dayName)';
-      case TimePeriod.week:
-        final end = start.add(const Duration(days: 6));
-        return '${start.day} ${months[start.month - 1]} – ${end.day} ${months[end.month - 1]} ${end.year}';
-      case TimePeriod.month:
-        return '${months[_selectedHomeDate.month - 1]} ${_selectedHomeDate.year}';
-      case TimePeriod.year:
-        return '${_selectedHomeDate.year}';
-      case TimePeriod.period:
-        return '${months[_selectedHomeDate.month - 1]} ${_selectedHomeDate.year}';
-    }
-  }
-
-  void _onPreviousPeriod(TimePeriod period) {
-    setState(() {
-      switch (period) {
-        case TimePeriod.day:
-          _selectedHomeDate = _selectedHomeDate.subtract(const Duration(days: 1));
-          break;
-        case TimePeriod.week:
-          _selectedHomeDate = _selectedHomeDate.subtract(const Duration(days: 7));
-          break;
-        case TimePeriod.month:
-        case TimePeriod.period:
-          _selectedHomeDate = DateTime(_selectedHomeDate.year, _selectedHomeDate.month - 1, _selectedHomeDate.day.clamp(1, 28));
-          break;
-        case TimePeriod.year:
-          _selectedHomeDate = DateTime(_selectedHomeDate.year - 1, _selectedHomeDate.month, _selectedHomeDate.day.clamp(1, 28));
-          break;
-      }
-    });
-  }
-
-  void _onNextPeriod(TimePeriod period) {
-    setState(() {
-      switch (period) {
-        case TimePeriod.day:
-          _selectedHomeDate = _selectedHomeDate.add(const Duration(days: 1));
-          break;
-        case TimePeriod.week:
-          _selectedHomeDate = _selectedHomeDate.add(const Duration(days: 7));
-          break;
-        case TimePeriod.month:
-        case TimePeriod.period:
-          _selectedHomeDate = DateTime(_selectedHomeDate.year, _selectedHomeDate.month + 1, _selectedHomeDate.day.clamp(1, 28));
-          break;
-        case TimePeriod.year:
-          _selectedHomeDate = DateTime(_selectedHomeDate.year + 1, _selectedHomeDate.month, _selectedHomeDate.day.clamp(1, 28));
-          break;
-      }
-    });
-  }
-
-  Future<void> _pickCalendarDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedHomeDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+    _filterState = DashboardFilterState(
+      accountId: initialAccountId,
+      periodMode: settings.defaultPeriod,
+      anchorDate: DateTime(now.year, now.month, now.day),
+      tabType: settings.defaultTransactionType,
     );
-    if (picked != null && mounted) {
+
+    _updateFilter(_filterState!);
+  }
+
+  @override
+  void dispose() {
+    MainNavigationService.currentTabNotifier.removeListener(_onTabNavigated);
+    super.dispose();
+  }
+
+  void _onTabNavigated() {
+    if (MainNavigationService.currentTabNotifier.value == 0 && mounted) {
+      final txProvider = context.read<TransactionProvider>();
+      final settings = context.read<SettingsProvider>();
+
+      final focusChanged = settings.dashboardFocus != _lastKnownFocus ||
+          (settings.dashboardFocus == DashboardFocusMode.selectedAccount &&
+              settings.dashboardSelectedAccountId != _lastKnownSelectedAccountId);
+
+      if (focusChanged) {
+        _lastKnownFocus = settings.dashboardFocus;
+        _lastKnownSelectedAccountId = settings.dashboardSelectedAccountId;
+        String? targetId;
+        switch (settings.dashboardFocus) {
+          case DashboardFocusMode.allAccounts:
+            targetId = null;
+            break;
+          case DashboardFocusMode.selectedAccount:
+            targetId = settings.dashboardSelectedAccountId ?? settings.primaryAccountId;
+            break;
+          case DashboardFocusMode.primaryAccount:
+            targetId = settings.primaryAccountId;
+            break;
+        }
+        _lastLedgerRevision = txProvider.ledgerRevision;
+        if (_filterState != null) {
+          _updateFilter(_filterState!.copyWith(accountId: targetId, clearAccountId: targetId == null));
+        }
+      } else if (txProvider.ledgerRevision != _lastLedgerRevision) {
+        _lastLedgerRevision = txProvider.ledgerRevision;
+        if (_filterState != null) {
+          _updateFilter(_filterState!);
+        }
+      }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final txProvider = Provider.of<TransactionProvider>(context);
+    final accountProvider = Provider.of<AccountProvider>(context);
+    final settings = Provider.of<SettingsProvider>(context);
+
+    // Check if settings changed externally (e.g. from Currency & Accounts Settings screen)
+    final focusChanged = settings.dashboardFocus != _lastKnownFocus ||
+        (settings.dashboardFocus == DashboardFocusMode.selectedAccount &&
+            settings.dashboardSelectedAccountId != _lastKnownSelectedAccountId);
+
+    if (focusChanged) {
+      _lastKnownFocus = settings.dashboardFocus;
+      _lastKnownSelectedAccountId = settings.dashboardSelectedAccountId;
+      String? targetId;
+      switch (settings.dashboardFocus) {
+        case DashboardFocusMode.allAccounts:
+          targetId = null;
+          break;
+        case DashboardFocusMode.selectedAccount:
+          targetId = settings.dashboardSelectedAccountId ?? settings.primaryAccountId;
+          break;
+        case DashboardFocusMode.primaryAccount:
+          targetId = settings.primaryAccountId;
+          break;
+      }
+      _lastLedgerRevision = txProvider.ledgerRevision;
+      if (_filterState != null) {
+        _updateFilter(_filterState!.copyWith(accountId: targetId, clearAccountId: targetId == null));
+        return;
+      }
+    }
+
+    // Initial or corrected account resolution once accounts are loaded
+    if (accountProvider.accountsWithBalances.isNotEmpty) {
+      final validAccountIds = accountProvider.accountsWithBalances.map((a) => a.account.id).toSet();
+
+      // If current filter account ID does not exist in active accounts, re-point to valid account
+      if (_filterState != null && _filterState!.accountId != null && !validAccountIds.contains(_filterState!.accountId)) {
+        String? targetId;
+        switch (settings.dashboardFocus) {
+          case DashboardFocusMode.allAccounts:
+            targetId = null;
+            break;
+          case DashboardFocusMode.selectedAccount:
+          case DashboardFocusMode.primaryAccount:
+            targetId = (settings.primaryAccountId != null && validAccountIds.contains(settings.primaryAccountId))
+                ? settings.primaryAccountId
+                : accountProvider.accountsWithBalances.first.account.id;
+            break;
+        }
+        _hasResolvedInitialAccount = true;
+        _lastLedgerRevision = txProvider.ledgerRevision;
+        _updateFilter(_filterState!.copyWith(accountId: targetId));
+        return;
+      }
+
+      if (!_hasResolvedInitialAccount) {
+        _hasResolvedInitialAccount = true;
+        if (_filterState != null && _filterState!.accountId == null && settings.dashboardFocus != DashboardFocusMode.allAccounts) {
+          final targetId = (settings.primaryAccountId != null && validAccountIds.contains(settings.primaryAccountId))
+              ? settings.primaryAccountId
+              : accountProvider.accountsWithBalances.first.account.id;
+          _lastLedgerRevision = txProvider.ledgerRevision;
+          _updateFilter(_filterState!.copyWith(accountId: targetId));
+          return;
+        }
+      }
+    }
+
+    // React to ledger revisions (transaction add/edit/delete/transfers/import)
+    if (txProvider.ledgerRevision != _lastLedgerRevision) {
+      _lastLedgerRevision = txProvider.ledgerRevision;
+      if (_filterState != null) {
+        _updateFilter(_filterState!);
+      }
+    }
+  }
+
+  Future<void> _updateFilter(DashboardFilterState newFilter, {bool isTabOnlyChange = false}) async {
+    _filterState = newFilter;
+
+    // If only the expense/income tab changed, filter in-memory immediately without network/db query
+    if (isTabOnlyChange) {
+      setState(() {});
+      return;
+    }
+
+    final currentToken = ++_queryToken;
+    final targetFilter = newFilter;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final txProvider = context.read<TransactionProvider>();
+      final items = await txProvider.repository.getUnifiedLedger(
+        accountId: targetFilter.accountId,
+        startDate: targetFilter.startDate,
+        endDate: targetFilter.endDate,
+        exclusiveEndDate: true,
+        limit: -1,
+        offset: 0,
+      );
+
+      // Verify that this query corresponds to the active token (ignore stale out-of-order queries)
+      if (!mounted || currentToken != _queryToken) return;
+
       setState(() {
-        _selectedHomeDate = DateTime(picked.year, picked.month, picked.day);
+        _periodItems = items;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted || currentToken != _queryToken) return;
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Unable to load dashboard data: $e';
       });
     }
   }
 
-  void _onToday() {
-    final now = DateTime.now();
-    setState(() {
-      _selectedHomeDate = DateTime(now.year, now.month, now.day);
-    });
+  void _onPreviousPeriod() {
+    if (_filterState == null) return;
+    _updateFilter(_filterState!.previousPeriod());
   }
+
+  void _onNextPeriod() {
+    if (_filterState == null) return;
+    _updateFilter(_filterState!.nextPeriod());
+  }
+
+  void _onToday() {
+    if (_filterState == null) return;
+    _updateFilter(_filterState!.toCurrentPeriod());
+  }
+
+  void _onPeriodChanged(TimePeriod p) {
+    if (_filterState == null) return;
+    _updateFilter(_filterState!.copyWith(periodMode: p));
+  }
+
+  void _onTabSelected(LedgerTabType t) {
+    if (_filterState == null) return;
+    _updateFilter(_filterState!.copyWith(tabType: t), isTabOnlyChange: true);
+  }
+
+  Future<void> _pickCalendarDate() async {
+    if (_filterState == null) return;
+    final period = _filterState!.periodMode;
+
+    if (period == TimePeriod.period) {
+      final initialRange = _filterState!.customDateRange ??
+          DateTimeRange(
+            start: DateTime(_filterState!.anchorDate.year, _filterState!.anchorDate.month, 1),
+            end: _filterState!.anchorDate,
+          );
+      final picked = await showDateRangePicker(
+        context: context,
+        initialDateRange: initialRange,
+        firstDate: DateTime(2000),
+        lastDate: DateTime(2100),
+      );
+      if (picked != null && mounted) {
+        _updateFilter(_filterState!.copyWith(
+          customDateRange: picked,
+          anchorDate: picked.start,
+        ));
+      }
+      return;
+    }
+
+    if (period == TimePeriod.month) {
+      final picked = await MonthPickerDialog.show(context, _filterState!.anchorDate);
+      if (picked != null && mounted) {
+        _updateFilter(_filterState!.copyWith(
+          anchorDate: picked,
+        ));
+      }
+      return;
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _filterState!.anchorDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      initialDatePickerMode: period == TimePeriod.year ? DatePickerMode.year : DatePickerMode.day,
+    );
+    if (picked != null && mounted) {
+      _updateFilter(_filterState!.copyWith(
+        anchorDate: period == TimePeriod.year
+            ? DateTime(picked.year, 1, 1)
+            : DateTime(picked.year, picked.month, picked.day),
+      ));
+    }
+  }
+
+  Future<void> _openCategoryDrillDown({
+    required BuildContext context,
+    required String catId,
+    required String catName,
+    required IconData catIcon,
+    required Color catColor,
+    required bool isExpenses,
+    required DashboardFilterState filter,
+    required String displayedAccountName,
+    required AccountProvider accountProvider,
+    required TransactionProvider txProvider,
+  }) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CategoryTransactionsScreen(
+          categoryId: catId,
+          categoryName: catName,
+          categoryIcon: catIcon,
+          categoryColor: catColor,
+          categoryType: isExpenses ? CategoryType.expense : CategoryType.income,
+          dateRangeLabel: filter.dateRangeLabel,
+          startMillis: filter.startDate.millisecondsSinceEpoch,
+          endMillis: filter.endDate.millisecondsSinceEpoch,
+          accountId: filter.accountId,
+          accountName: displayedAccountName,
+        ),
+      ),
+    );
+    await Future.wait([
+      accountProvider.loadAccounts(),
+      txProvider.loadLedger(),
+      _updateFilter(filter),
+    ]);
+  }
+
 
   void _showAccountPicker(BuildContext context, List<AccountWithBalance> accounts, String? activeAccountId) {
     showModalBottomSheet(
@@ -171,6 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       builder: (ctx) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
+        final primaryColor = Theme.of(context).colorScheme.primary;
         final settings = context.watch<SettingsProvider>();
 
         return SafeArea(
@@ -192,9 +395,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 Divider(color: isDark ? AppColors.darkBorderSubtle : null),
                 ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: AppColors.primaryContainer,
-                    child: Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
+                  leading: CircleAvatar(
+                    backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.primaryContainer,
+                    child: Icon(Icons.account_balance_wallet_rounded, color: isDark ? primaryColor : AppColors.primary),
                   ),
                   title: Text(
                     'All Accounts',
@@ -208,16 +411,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                   ),
                   trailing: activeAccountId == null
-                      ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                      ? Icon(Icons.check_circle_rounded, color: isDark ? primaryColor : AppColors.primary)
                       : null,
                   onTap: () {
-                    setState(() => _sessionAccountId = '__ALL__');
                     Navigator.pop(ctx);
+                    final settings = context.read<SettingsProvider>();
+                    _lastKnownFocus = DashboardFocusMode.allAccounts;
+                    _lastKnownSelectedAccountId = null;
+                    settings.setDashboardFocus(DashboardFocusMode.allAccounts);
+                    settings.setDashboardSelectedAccountId(null);
+                    if (_filterState != null) {
+                      _updateFilter(_filterState!.copyWith(clearAccountId: true));
+                    }
                   },
                 ),
                 ...accounts.map((acc) {
                   final isSelected = acc.account.id == activeAccountId;
-                  final color = acc.account.color != null ? Color(acc.account.color!) : AppColors.primary;
+                  final color = acc.account.color != null ? Color(acc.account.color!) : (isDark ? primaryColor : AppColors.primary);
 
                   return ListTile(
                     leading: CircleAvatar(
@@ -239,11 +449,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     trailing: isSelected
-                        ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                        ? Icon(Icons.check_circle_rounded, color: isDark ? primaryColor : AppColors.primary)
                         : null,
                     onTap: () {
-                      setState(() => _sessionAccountId = acc.account.id);
                       Navigator.pop(ctx);
+                      final settings = context.read<SettingsProvider>();
+                      _lastKnownFocus = DashboardFocusMode.selectedAccount;
+                      _lastKnownSelectedAccountId = acc.account.id;
+                      settings.setDashboardFocus(DashboardFocusMode.selectedAccount);
+                      settings.setDashboardSelectedAccountId(acc.account.id);
+                      if (_filterState != null) {
+                        _updateFilter(_filterState!.copyWith(accountId: acc.account.id));
+                      }
                     },
                   );
                 }),
@@ -262,38 +479,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final catProvider = context.watch<CategoryProvider>();
     final settings = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     final accounts = accountProvider.accountsWithBalances;
-    final period = _effectivePeriod(settings);
-    final tab = _effectiveTab(settings);
 
-    final now = DateTime.now();
-    final isSelectedToday = _selectedHomeDate.year == now.year &&
-        _selectedHomeDate.month == now.month &&
-        _selectedHomeDate.day == now.day;
+    // Use current filter state or fallback to default
+    final filter = _filterState ??
+        DashboardFilterState(
+          accountId: null,
+          periodMode: settings.defaultPeriod,
+          anchorDate: DateTime.now(),
+          tabType: settings.defaultTransactionType,
+        );
 
-    // Determine Active Account Scope
-    String? effectiveAccountId;
-    if (_sessionAccountId == '__ALL__') {
-      effectiveAccountId = null; // All accounts
-    } else if (_sessionAccountId != null) {
-      effectiveAccountId = _sessionAccountId;
-    } else {
-      // Follow Settings
-      switch (settings.dashboardFocus) {
-        case DashboardFocusMode.allAccounts:
-          effectiveAccountId = null;
-          break;
-        case DashboardFocusMode.selectedAccount:
-          effectiveAccountId = settings.dashboardSelectedAccountId ?? settings.primaryAccountId;
-          break;
-        case DashboardFocusMode.primaryAccount:
-          effectiveAccountId = settings.primaryAccountId ?? (accounts.isNotEmpty ? accounts.first.account.id : null);
-          break;
-      }
-    }
+    final effectiveAccountId = filter.accountId;
+    final period = filter.periodMode;
+    final tab = filter.tabType;
 
-    // Header balance
+    // Header balance calculation
     int displayedBalanceUnits = 0;
     String displayedAccountName = 'All Accounts';
 
@@ -313,31 +516,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final formattedBalance = Money.fromUnits(displayedBalanceUnits).format(currency: settings.currency);
 
-    // Filter transactions for the selected local period & account [start, end)
-    final startMillis = _periodStartDate(period).millisecondsSinceEpoch;
-    final endMillis = _periodEndDate(period).millisecondsSinceEpoch;
-
-    final sourceItems = txProvider.allLedgerItems.isNotEmpty
-        ? txProvider.allLedgerItems
-        : txProvider.ledgerItems;
-
-    final periodTransactions = sourceItems.where((tx) {
-      final txMillis = tx.date.millisecondsSinceEpoch;
-      final inDate = txMillis >= startMillis && txMillis < endMillis;
-      if (!inDate) return false;
-      if (effectiveAccountId != null) {
-        if (tx.type == LedgerItemType.transfer) {
-          return tx.accountId == effectiveAccountId || tx.destinationAccountId == effectiveAccountId;
-        }
-        return tx.accountId == effectiveAccountId;
-      }
-      return true;
-    }).toList();
-
-    // Tab-filtered transactions (Expenses vs Income)
+    // Filter period transactions for current tab (Expenses vs Income vs All)
     final isExpenses = tab == LedgerTabType.expenses;
-    final tabTransactions = periodTransactions.where((tx) {
-      if (isExpenses) {
+    final tabTransactions = _periodItems.where((tx) {
+      if (tab == LedgerTabType.all) {
+        return true;
+      } else if (isExpenses) {
         return tx.type == LedgerItemType.expense;
       } else {
         return tx.type == LedgerItemType.income;
@@ -351,6 +535,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final Map<String, IconData> categoryIcons = {};
 
     for (final tx in tabTransactions) {
+      // Transfers under All filter do not add to expense/income category totals
+      if (tx.type == LedgerItemType.transfer) continue;
+
       totalTabUnits += tx.amountUnits;
       final catId = tx.categoryId ?? 'other';
       categoryTotals[catId] = (categoryTotals[catId] ?? 0) + tx.amountUnits;
@@ -379,32 +566,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final val = (categoryTotals[catId] ?? 0).toDouble();
       final pct = totalTabUnits > 0 ? (val / totalTabUnits) : 0.0;
       return DonutSegment(
+        categoryId: catId,
         label: categoryNames[catId] ?? 'Other',
         value: val,
-        color: categoryColors[catId] ?? AppColors.primary,
+        color: categoryColors[catId] ?? (isDark ? primaryColor : AppColors.primary),
         percentage: pct,
+        iconData: categoryIcons[catId],
       );
     }).toList();
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final dateSpecificEmptyMessage = period == TimePeriod.day
         ? (isExpenses
-            ? 'There were\nno expenses on\n${_selectedHomeDate.day} ${months[_selectedHomeDate.month - 1]} ${_selectedHomeDate.year}'
-            : 'There was\nno income on\n${_selectedHomeDate.day} ${months[_selectedHomeDate.month - 1]} ${_selectedHomeDate.year}')
-        : (isExpenses
-            ? 'There were\nno expenses\nin this ${period.displayName.toLowerCase()}'
-            : 'There was\nno income\nin this ${period.displayName.toLowerCase()}');
+            ? 'There were no expenses on this day'
+            : (tab == LedgerTabType.all
+                ? 'There were no transactions on this day'
+                : 'There was no income on this day'))
+        : period == TimePeriod.week
+            ? (isExpenses
+                ? 'There were no expenses in this week'
+                : (tab == LedgerTabType.all
+                    ? 'There were no transactions in this week'
+                    : 'There was no income in this week'))
+            : period == TimePeriod.month
+                ? (isExpenses
+                    ? 'There were no expenses in this month'
+                    : (tab == LedgerTabType.all
+                        ? 'There were no transactions in this month'
+                        : 'There was no income in this month'))
+                : period == TimePeriod.year
+                    ? (isExpenses
+                        ? 'There were no expenses in this year'
+                        : (tab == LedgerTabType.all
+                            ? 'There were no transactions in this year'
+                            : 'There was no income in this year'))
+                    : (isExpenses
+                        ? 'There were no expenses in this period'
+                        : (tab == LedgerTabType.all
+                            ? 'There were no transactions in this period'
+                            : 'There was no income in this period'));
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: Column(
         children: [
-          // 1. Top Header with Hamburger Menu, Account Switcher, Balance, and EXPENSES/INCOME tabs
+          // 1. Top Header with Brand Primary, Hamburger Menu, Account Switcher, Balance, and EXPENSES/INCOME tabs
           AppHeader(
+            backgroundColor: isDark ? AppColors.darkSurface : AppColors.primary,
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(30),
+            ),
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 6,
+              left: 16,
+              right: 16,
+              bottom: 26,
+            ),
             showBackButton: false,
             leading: IconButton(
-              icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 26),
+              icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
               tooltip: 'Navigation Menu',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               onPressed: () {
                 MainNavigationService.openDrawer();
               },
@@ -412,327 +634,384 @@ class _DashboardScreenState extends State<DashboardScreen> {
             titleWidget: GestureDetector(
               onTap: () => _showAccountPicker(context, accounts, effectiveAccountId),
               behavior: HitTestBehavior.opaque,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.account_balance_rounded, color: Colors.white, size: 16),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        displayedAccountName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Icon(Icons.account_balance_rounded, color: Colors.white, size: 16),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      displayedAccountName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                        height: 1.15,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down_rounded, color: Colors.white, size: 20),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down_rounded, color: Colors.white, size: 20),
+                ],
               ),
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.search_rounded, color: Colors.white, size: 24),
-                tooltip: 'Search Transactions',
+                icon: const Icon(Icons.file_download_rounded, color: Colors.white, size: 24),
+                tooltip: 'Export',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                 onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TransactionsScreen()),
+                  ExportBottomSheet.show(
+                    context,
+                    periodMode: filter.periodMode,
+                    anchorDate: filter.anchorDate,
+                    customDateRange: filter.customDateRange,
+                    accountId: filter.accountId,
+                    accountName: displayedAccountName,
+                    typeFilter: filter.tabType == LedgerTabType.expenses
+                        ? LedgerItemType.expense
+                        : (filter.tabType == LedgerTabType.income
+                            ? LedgerItemType.income
+                            : null),
                   );
                 },
               ),
             ],
             bottom: Column(
               children: [
-                const SizedBox(height: 6),
-                // Prominent Financial Amount
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      formattedBalance,
-                      style: AppTypography.displayLarge.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        if (effectiveAccountId != null) {
-                          final targetAcc = accounts.where((a) => a.account.id == effectiveAccountId).firstOrNull;
-                          if (targetAcc != null) {
-                            EditAccountBalanceDialog.show(context, targetAcc);
-                            return;
-                          }
-                        }
-                        if (accounts.length == 1) {
-                          EditAccountBalanceDialog.show(context, accounts.first);
-                          return;
-                        }
-                        // If All Accounts selected, prompt user to select account to edit balance
-                        showModalBottomSheet(
-                          context: context,
-                          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-                          builder: (ctx) => SafeArea(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                                    child: Text(
-                                      'Select Account to Edit Balance',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                  Divider(color: isDark ? AppColors.darkBorderSubtle : null),
-                                  ...accounts.map((accItem) => ListTile(
-                                    leading: Icon(accItem.account.iconData, color: Color(accItem.account.color ?? AppColors.primary.toARGB32())),
-                                    title: Text(
-                                      accItem.account.name,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      accItem.calculatedBalance.format(currency: settings.currency),
-                                      style: TextStyle(
-                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                                      ),
-                                    ),
-                                    trailing: const Icon(Icons.edit_outlined, size: 20),
-                                    onTap: () {
-                                      Navigator.pop(ctx);
-                                      EditAccountBalanceDialog.show(context, accItem);
-                                    },
-                                  )),
-                                ],
-                              ),
-                            ),
+                const SizedBox(height: 2),
+                // Prominent Financial Amount with optically centered Edit Icon
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          formattedBalance,
+                          style: AppTypography.displayLarge.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            height: 1.15,
                           ),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                         ),
-                        child: const Icon(Icons.edit_outlined, color: Colors.white, size: 16),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      // Compact circular touch target edit button
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            if (effectiveAccountId != null) {
+                              final targetAcc = accounts.where((a) => a.account.id == effectiveAccountId).firstOrNull;
+                              if (targetAcc != null) {
+                                EditAccountBalanceDialog.show(context, targetAcc);
+                                return;
+                              }
+                            }
+                            if (accounts.length == 1) {
+                              EditAccountBalanceDialog.show(context, accounts.first);
+                              return;
+                            }
+                            showModalBottomSheet(
+                              context: context,
+                              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                              builder: (ctx) => SafeArea(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                                        child: Text(
+                                          'Select Account to Edit Balance',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      Divider(color: isDark ? AppColors.darkBorderSubtle : null),
+                                      ...accounts.map((accItem) => ListTile(
+                                        leading: Icon(accItem.account.iconData, color: Color(accItem.account.color ?? (isDark ? primaryColor.toARGB32() : AppColors.primary.toARGB32()))),
+                                        title: Text(
+                                          accItem.account.name,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          accItem.calculatedBalance.format(currency: settings.currency),
+                                          style: TextStyle(
+                                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                          ),
+                                        ),
+                                        trailing: const Icon(Icons.edit_rounded, size: 20),
+                                        onTap: () {
+                                          Navigator.pop(ctx);
+                                          EditAccountBalanceDialog.show(context, accItem);
+                                        },
+                                      )),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(Icons.edit_rounded, color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
                 // EXPENSES / INCOME Tabs with active white underline
                 TransactionTypeTabs(
                   selectedTab: tab,
-                  onTabSelected: (t) => setState(() => _selectedTab = t),
+                  onTabSelected: _onTabSelected,
                   isHeaderStyle: true,
                 ),
               ],
             ),
           ),
 
-          // 2. Focused Main Content Body (Panel + Donut Chart + Category Breakdown Cards)
+          // 2. Focused Main Content Body: Overlapping White Dashboard Panel
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await Future.wait([
-                  accountProvider.loadAccounts(),
-                  txProvider.loadLedger(),
-                ]);
-              },
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                children: [
-                  // Main Visualization Panel (Period Selector + Date Navigation + Donut Chart)
-                  AppCard(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                    child: Column(
-                      children: [
-                        // Period Selector (Day | Week | Month | Year | Period) with direct calendar tap
-                        PeriodSelector(
-                          selectedPeriod: period,
-                          onPeriodChanged: (p) => setState(() => _selectedPeriod = p),
-                          dateRangeLabel: _periodLabel(period),
-                          onPrevious: () => _onPreviousPeriod(period),
-                          onNext: () => _onNextPeriod(period),
-                          onTapDate: _pickCalendarDate,
-                          onToday: _onToday,
-                          isToday: isSelectedToday,
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // Donut Chart
-                        DonutChart(
-                          segments: donutSegments,
-                          centerAmount: formattedTabTotal,
-                          centerLabel: isExpenses ? 'EXPENSES' : 'INCOME',
-                          size: 210,
-                          strokeWidth: 20,
-                          isEmpty: tabTransactions.isEmpty,
-                          emptyMessage: dateSpecificEmptyMessage,
-                        ),
-                      ],
-                    ),
+            child: Transform.translate(
+              offset: const Offset(0, -18),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkSurfaceCard : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.07),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
-
-                  // Category Breakdown Cards List (Tappable for granular transaction details)
-                  if (sortedCatIds.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    ...sortedCatIds.map((catId) {
-                      final catUnits = categoryTotals[catId] ?? 0;
-                      final catName = categoryNames[catId] ?? 'Category';
-                      final catColor = categoryColors[catId] ?? AppColors.primary;
-                      final catIcon = categoryIcons[catId] ?? Icons.category_rounded;
-                      final percentage = totalTabUnits > 0 ? (catUnits / totalTabUnits * 100).round() : 0;
-                      final formattedCatAmount = Money.fromUnits(catUnits).format(currency: settings.currency);
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CategoryTransactionsScreen(
-                                    categoryId: catId,
-                                    categoryName: catName,
-                                    categoryIcon: catIcon,
-                                    categoryColor: catColor,
-                                    categoryType: isExpenses ? CategoryType.expense : CategoryType.income,
-                                    dateRangeLabel: _periodLabel(period),
-                                    startMillis: startMillis,
-                                    endMillis: endMillis,
-                                    accountId: effectiveAccountId,
-                                    accountName: displayedAccountName,
-                                  ),
-                                ),
-                              );
-                              await Future.wait([
-                                accountProvider.loadAccounts(),
-                                txProvider.loadLedger(),
-                              ]);
-                            },
-                            borderRadius: BorderRadius.circular(16),
-                            child: AppCard(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              child: Row(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        await Future.wait([
+                          accountProvider.loadAccounts(),
+                          txProvider.loadLedger(),
+                          if (_filterState != null) _updateFilter(_filterState!),
+                        ]);
+                      },
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: catColor.withValues(alpha: 0.15),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: catColor.withValues(alpha: 0.3), width: 1),
-                                    ),
-                                    child: Icon(catIcon, color: catColor, size: 24),
+                                  // Period Selector (Day | Week | Month | Year | Period)
+                                  PeriodSelector(
+                                    selectedPeriod: period,
+                                    onPeriodChanged: _onPeriodChanged,
+                                    dateRangeLabel: filter.dateRangeLabel,
+                                    onPrevious: _onPreviousPeriod,
+                                    onNext: _onNextPeriod,
+                                    onTapDate: _pickCalendarDate,
+                                    onToday: _onToday,
+                                    canJumpToToday: !filter.isCurrentPeriod(),
                                   ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Text(
-                                      catName,
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+
+                                  // Subtle Loading Progress Indicator
+                                  if (_isLoading) ...[
+                                    const SizedBox(height: 8),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        minHeight: 2.5,
+                                        backgroundColor: Colors.transparent,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          isDark ? AppColors.darkPrimary : AppColors.primary,
+                                        ),
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ] else ...[
+                                    const SizedBox(height: 18),
+                                  ],
+
+                                  // Error State Banner if query failed
+                                  if (_errorMessage != null) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              _errorMessage!,
+                                              style: const TextStyle(color: Colors.red, fontSize: 12),
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => _updateFilter(filter),
+                                            child: const Text('Retry', style: TextStyle(fontSize: 12)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+
+                                  // Centered Large Donut Chart with Category Tap Drill-Down
+                                  Center(
+                                    child: DonutChart(
+                                      segments: donutSegments,
+                                      centerAmount: formattedTabTotal,
+                                      centerLabel: isExpenses ? 'EXPENSES' : (tab == LedgerTabType.all ? 'TOTAL' : 'INCOME'),
+                                      size: 230,
+                                      strokeWidth: 24,
+                                      isLoading: _isLoading,
+                                      isEmpty: tabTransactions.isEmpty,
+                                      emptyMessage: dateSpecificEmptyMessage,
+                                      onCenterTapped: () async {
+                                        if (tabTransactions.isEmpty) return;
+                                        await Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => PeriodTransactionsScreen(
+                                              title: isExpenses
+                                                  ? 'Expenses'
+                                                  : (tab == LedgerTabType.all ? 'All Transactions' : 'Income'),
+                                              dateRangeLabel: filter.dateRangeLabel,
+                                              startMillis: filter.startDate.millisecondsSinceEpoch,
+                                              endMillis: filter.endDate.millisecondsSinceEpoch,
+                                              accountId: filter.accountId,
+                                              accountName: displayedAccountName,
+                                              typeFilter: isExpenses
+                                                  ? LedgerItemType.expense
+                                                  : (tab == LedgerTabType.income
+                                                      ? LedgerItemType.income
+                                                      : null),
+                                            ),
+                                          ),
+                                        );
+                                        await Future.wait([
+                                          accountProvider.loadAccounts(),
+                                          txProvider.loadLedger(),
+                                          _updateFilter(filter),
+                                        ]);
+                                      },
+                                      onSegmentTapped: (segment) {
+                                        final catId = segment.categoryId;
+                                        if (catId == null) return;
+                                        _openCategoryDrillDown(
+                                          context: context,
+                                          catId: catId,
+                                          catName: segment.label,
+                                          catIcon: segment.iconData ?? (categoryIcons[catId] ?? Icons.category_rounded),
+                                          catColor: segment.color,
+                                          isExpenses: isExpenses,
+                                          filter: filter,
+                                          displayedAccountName: displayedAccountName,
+                                          accountProvider: accountProvider,
+                                          txProvider: txProvider,
+                                        );
+                                      },
                                     ),
                                   ),
-                                  Text(
-                                    '$percentage%',
-                                    style: TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Text(
-                                    formattedCatAmount,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w800,
-                                      color: isExpenses ? AppColors.expense : AppColors.income,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 18,
-                                    color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
-                                  ),
+                                  const SizedBox(height: 20),
                                 ],
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
-                  ],
 
-                  const SizedBox(height: 80), // Clean bottom space for floating + action
-                ],
+                          // Circular Yellow Add Button positioned inside the panel at bottom-right
+                          Positioned(
+                            bottom: 14,
+                            right: 14,
+                            child: Material(
+                              color: AppColors.floatingAction,
+                              shape: const CircleBorder(),
+                              elevation: 4,
+                              shadowColor: Colors.black26,
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () async {
+                                  final changed = await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AddEditTransactionScreen(
+                                        initialMode: tab == LedgerTabType.expenses
+                                            ? EntryMode.expense
+                                            : EntryMode.income,
+                                        initialAccountId: effectiveAccountId ?? settings.primaryAccountId,
+                                        initialDate: filter.anchorDate,
+                                      ),
+                                    ),
+                                  );
+                                  if (changed == true) {
+                                    await Future.wait([
+                                      accountProvider.loadAccounts(),
+                                      txProvider.loadLedger(),
+                                      if (_filterState != null) _updateFilter(_filterState!),
+                                    ]);
+                                  }
+                                },
+                                child: const SizedBox(
+                                  width: 52,
+                                  height: 52,
+                                  child: Icon(
+                                    Icons.add_rounded,
+                                    size: 32,
+                                    color: Color(0xFF1B1E24),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
         ],
-      ),
-
-      // 3. Floating Add Action Button (Warm Yellow/Amber circular +)
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final changed = await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => AddEditTransactionScreen(
-                initialMode: tab == LedgerTabType.expenses
-                    ? EntryMode.expense
-                    : EntryMode.income,
-                initialAccountId: effectiveAccountId ?? settings.defaultTransactionAccountId ?? settings.primaryAccountId,
-                initialDate: _selectedHomeDate,
-              ),
-            ),
-          );
-          if (changed == true) {
-            await Future.wait([
-              accountProvider.loadAccounts(),
-              txProvider.loadLedger(),
-            ]);
-          }
-        },
-        backgroundColor: AppColors.accentYellow,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add_rounded, size: 32),
       ),
     );
   }

@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/date_wise_timeline.dart';
 import '../../../accounts/presentation/providers/account_provider.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
+import '../../../transactions/domain/entities/transaction.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/presentation/screens/add_edit_transaction_screen.dart';
-import '../../../transactions/presentation/widgets/transaction_list_item.dart';
 import '../../domain/entities/category.dart';
 
 class CategoryTransactionsScreen extends StatelessWidget {
@@ -48,11 +50,14 @@ class CategoryTransactionsScreen extends StatelessWidget {
         ? txProvider.allLedgerItems
         : txProvider.ledgerItems;
 
-    // Filter items matching category, date range, and account scope
+    // Filter items matching category, date range [start, end), and account scope
     final matchingItems = sourceItems.where((item) {
       if (item.categoryId != categoryId) return false;
+      if (item.type == LedgerItemType.transfer) return false;
+      if (categoryType == CategoryType.expense && item.type != LedgerItemType.expense) return false;
+      if (categoryType == CategoryType.income && item.type != LedgerItemType.income) return false;
       final itemMillis = item.date.millisecondsSinceEpoch;
-      if (itemMillis < startMillis || itemMillis > endMillis) return false;
+      if (itemMillis < startMillis || itemMillis >= endMillis) return false;
       if (accountId != null && item.accountId != accountId) return false;
       return true;
     }).toList();
@@ -126,7 +131,7 @@ class CategoryTransactionsScreen extends StatelessWidget {
             ),
           ),
 
-          // Transactions List Body
+          // Date-Grouped Transactions Timeline Body
           Expanded(
             child: matchingItems.isEmpty
                 ? Center(
@@ -166,57 +171,45 @@ class CategoryTransactionsScreen extends StatelessWidget {
                       ),
                     ),
                   )
-                : ListView.builder(
+                : ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    itemCount: matchingItems.length,
-                    itemBuilder: (context, index) {
-                      final item = matchingItems[index];
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: TransactionListItem(
-                          item: item,
-                          onTap: () async {
-                            final changed = await Navigator.of(context).push<bool>(
-                              MaterialPageRoute(
-                                builder: (_) => AddEditTransactionScreen(
-                                  transaction: item,
-                                ),
+                    children: [
+                      DateGroupedTransactionTimeline(
+                        transactions: matchingItems,
+                        onItemTap: (item) async {
+                          final changed = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) => AddEditTransactionScreen(
+                                transaction: item,
                               ),
-                            );
+                            ),
+                          );
 
-                            if (changed == true && context.mounted) {
+                          if (changed == true && context.mounted) {
+                            await Future.wait([
+                              accountProvider.loadAccounts(),
+                              txProvider.loadLedger(),
+                            ]);
+                          }
+                        },
+                        onItemDelete: (item) async {
+                          try {
+                            await context.read<TransactionProvider>().deleteTransaction(item.id);
+                            if (context.mounted) {
                               await Future.wait([
                                 accountProvider.loadAccounts(),
                                 txProvider.loadLedger(),
                               ]);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Transaction updated'),
-                                    duration: Duration(seconds: 2),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
+                              AppSnackBar.showSuccess(context, 'Transaction deleted successfully.');
                             }
-                          },
-                          onDelete: () async {
-                            await txProvider.deleteTransaction(item.id);
-                            await accountProvider.loadAccounts();
+                          } catch (e) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Transaction deleted'),
-                                  duration: Duration(seconds: 2),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
+                              AppSnackBar.showError(context, 'Failed to delete transaction: $e');
                             }
-                          },
-                        ),
-                      );
-                    },
+                          }
+                        },
+                      ),
+                    ],
                   ),
           ),
         ],

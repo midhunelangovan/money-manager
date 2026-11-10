@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/export_success_dialog.dart';
@@ -12,6 +13,7 @@ import '../../../accounts/presentation/providers/account_provider.dart';
 import '../../../backup/data/services/excel_export_service.dart';
 import '../../../backup/presentation/providers/backup_provider.dart';
 import '../../../backup/presentation/screens/excel_import_screen.dart';
+import '../../../backup/presentation/screens/export_history_screen.dart';
 import '../../../backup/presentation/screens/integrity_screen.dart';
 import '../../../categories/presentation/providers/category_provider.dart';
 import '../../../recurring/presentation/providers/recurring_provider.dart';
@@ -59,12 +61,7 @@ class _DataStorageSettingsScreenState extends State<DataStorageSettingsScreen> {
         type: ExportFileType.backup,
       );
     } else if (context.mounted && backupProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(backupProvider.errorMessage!),
-          backgroundColor: AppColors.expense,
-        ),
-      );
+      AppSnackBar.showError(context, backupProvider.errorMessage!);
     }
   }
 
@@ -192,12 +189,7 @@ class _DataStorageSettingsScreenState extends State<DataStorageSettingsScreen> {
         type: ExportFileType.excel,
       );
     } else if (context.mounted && backupProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(backupProvider.errorMessage!),
-          backgroundColor: AppColors.expense,
-        ),
-      );
+      AppSnackBar.showError(context, backupProvider.errorMessage!);
     }
   }
 
@@ -249,19 +241,9 @@ class _DataStorageSettingsScreenState extends State<DataStorageSettingsScreen> {
           context.read<TransferProvider>().loadTransfers();
           context.read<RecurringProvider>().loadRecurring();
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Data restored successfully!'),
-              backgroundColor: AppColors.income,
-            ),
-          );
+          AppSnackBar.showSuccess(context, 'Data restored successfully!');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(backupProvider.errorMessage ?? 'Restore failed'),
-              backgroundColor: AppColors.expense,
-            ),
-          );
+          AppSnackBar.showError(context, backupProvider.errorMessage ?? 'Restore failed');
         }
       }
     }
@@ -378,7 +360,7 @@ class _DataStorageSettingsScreenState extends State<DataStorageSettingsScreen> {
                         Divider(height: 1, indent: 68, endIndent: 16, color: isDark ? AppColors.darkBorderSubtle : null),
                         _buildActionTile(
                           context: context,
-                          icon: Icons.verified_user_outlined,
+                          icon: Icons.verified_user_rounded,
                           title: 'Database Integrity Check',
                           subtitle: 'Verify double-entry consistency and ledger audit integrity',
                           onTap: () {
@@ -407,7 +389,7 @@ class _DataStorageSettingsScreenState extends State<DataStorageSettingsScreen> {
                       children: [
                         _buildActionTile(
                           context: context,
-                          icon: Icons.file_download_outlined,
+                          icon: Icons.file_download_rounded,
                           title: 'Import from Excel',
                           subtitle: 'Import transactions from another finance application.',
                           onTap: () {
@@ -423,6 +405,18 @@ class _DataStorageSettingsScreenState extends State<DataStorageSettingsScreen> {
                           title: 'Export to Excel (XLSX)',
                           subtitle: 'Export accounts, categories, and transactions to standard XLSX',
                           onTap: () => _handleExcelExport(context, backupProvider),
+                        ),
+                        Divider(height: 1, indent: 68, endIndent: 16, color: isDark ? AppColors.darkBorderSubtle : null),
+                        _buildActionTile(
+                          context: context,
+                          icon: Icons.history_rounded,
+                          title: 'Export History & Files',
+                          subtitle: 'View, open, share, or locate previously exported spreadsheets and backups',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const ExportHistoryScreen()),
+                            );
+                          },
                         ),
                       ],
                     ),

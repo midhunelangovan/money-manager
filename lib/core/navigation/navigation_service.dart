@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 class MainNavigationService {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final GlobalKey<ScaffoldState> mainScaffoldKey = GlobalKey<ScaffoldState>();
   static ValueNotifier<int> currentTabNotifier = ValueNotifier<int>(0);
 

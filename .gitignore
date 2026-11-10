@@ -43,3 +43,19 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local scratch and tooling binaries
+scratch/
+*.exe
+
+# Databases, exports, backups, and signing credentials
+*.db
+*.sqlite
+*.sqlite3
+*.xlsx
+*.csv
+*.jks
+*.keystore
+*.key
+*.p12
+*.pem

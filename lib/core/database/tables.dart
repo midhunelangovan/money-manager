@@ -52,6 +52,8 @@ class DbColumns {
   static const String endDate = 'end_date';
   static const String nextExecutionDate = 'next_execution_date';
   static const String isActive = 'is_active';
+  static const String remindMe = 'remind_me';
+  static const String reminderLeadDays = 'reminder_lead_days';
 
   // Audit Logs
   static const String transactionId = 'transaction_id';

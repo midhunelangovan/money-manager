@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
@@ -227,6 +228,80 @@ class RawSheetRow {
   });
 }
 
+class CategoryMappingLookupMap extends MapBase<String, CategoryMappingEntry> {
+  final Map<String, CategoryMappingEntry> _inner;
+
+  CategoryMappingLookupMap([Map<String, CategoryMappingEntry>? inner])
+      : _inner = inner ?? <String, CategoryMappingEntry>{};
+
+  @override
+  CategoryMappingEntry? operator [](Object? key) {
+    if (key is! String) return null;
+    if (_inner.containsKey(key)) {
+      return _inner[key];
+    }
+    final keyLower = key.trim().toLowerCase();
+    for (final entry in _inner.values) {
+      if (entry.legacyName.trim().toLowerCase() == keyLower) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  @override
+  void operator []=(String key, CategoryMappingEntry value) {
+    // 1. Direct key match
+    if (_inner.containsKey(key)) {
+      _inner[key] = value;
+      return;
+    }
+    // 2. Composite key match ($legacyName|${categoryType.name})
+    final compositeKey = '${value.legacyName}|${value.categoryType.name}';
+    if (_inner.containsKey(compositeKey)) {
+      _inner[compositeKey] = value;
+      return;
+    }
+    // 3. Match by legacyName and categoryType
+    final valNameLower = value.legacyName.trim().toLowerCase();
+    for (final k in _inner.keys.toList()) {
+      final e = _inner[k]!;
+      if (e.legacyName.trim().toLowerCase() == valNameLower && e.categoryType == value.categoryType) {
+        _inner[k] = value;
+        return;
+      }
+    }
+    _inner[key] = value;
+  }
+
+  @override
+  void clear() => _inner.clear();
+
+  @override
+  Iterable<String> get keys => _inner.keys;
+
+  @override
+  CategoryMappingEntry? remove(Object? key) {
+    if (key is! String) return null;
+    if (_inner.containsKey(key)) return _inner.remove(key);
+    final keyLower = key.trim().toLowerCase();
+    for (final k in _inner.keys.toList()) {
+      if (_inner[k]!.legacyName.trim().toLowerCase() == keyLower) {
+        return _inner.remove(k);
+      }
+    }
+    return null;
+  }
+
+  @override
+  bool containsKey(Object? key) {
+    if (key is! String) return false;
+    if (_inner.containsKey(key)) return true;
+    final keyLower = key.trim().toLowerCase();
+    return _inner.values.any((e) => e.legacyName.trim().toLowerCase() == keyLower);
+  }
+}
+
 class ExcelSheetAnalysis {
   final List<String> sheetNames;
   final String sheetName;
@@ -242,7 +317,7 @@ class ExcelSheetAnalysis {
   final DateTime? latestDate;
   final Map<String, int> sourceMonthlyCoverage;
 
-  const ExcelSheetAnalysis({
+  ExcelSheetAnalysis({
     required this.sheetNames,
     required this.sheetName,
     required this.sheetType,
@@ -250,13 +325,15 @@ class ExcelSheetAnalysis {
     required this.totalRows,
     required this.rawRows,
     required this.accountMappings,
-    required this.categoryMappings,
+    required Map<String, CategoryMappingEntry> categoryMappings,
     required this.existingAccounts,
     required this.existingCategories,
     this.earliestDate,
     this.latestDate,
     this.sourceMonthlyCoverage = const {},
-  });
+  }) : categoryMappings = categoryMappings is CategoryMappingLookupMap
+            ? categoryMappings
+            : CategoryMappingLookupMap(categoryMappings);
 
   int get unmappedAccountsCount =>
       accountMappings.values.where((a) => a.status == MappingStatus.unmapped).length;
@@ -514,6 +591,19 @@ class ExcelImportService {
 
   String _getDataValueString(Data? data) => _getCellValueString(data?.value);
 
+  /// Centralized normalization helper for Excel imported text:
+  /// Converts null, empty string, whitespace, "null", "undefined", "none", "n/a", "-" to null.
+  String? _normalizeCellString(dynamic val) {
+    if (val == null) return null;
+    final str = val.toString().trim();
+    if (str.isEmpty) return null;
+    final lower = str.toLowerCase();
+    if (lower == 'null' || lower == 'undefined' || lower == 'none' || str == '-' || lower == 'n/a' || lower == 'na') {
+      return null;
+    }
+    return str;
+  }
+
   /// 2. Detects the header row and column indices for a selected sheet
   ExcelColumnMapping detectColumnMapping(Sheet sheet, String sheetName) {
     var detectedType = ExcelSheetType.fromName(sheetName);
@@ -725,8 +815,7 @@ class ExcelImportService {
 
         String? comment;
         if (mapping.commentIndex != null && mapping.commentIndex! < rawStrings.length) {
-          final c = rawStrings[mapping.commentIndex!].trim();
-          if (c.isNotEmpty) comment = c;
+          comment = _normalizeCellString(rawStrings[mapping.commentIndex!]);
         }
 
         String? legacyAccount;
@@ -736,36 +825,43 @@ class ExcelImportService {
 
         if (sheetType == ExcelSheetType.transfers) {
           if (mapping.outgoingAccountIndex != null && mapping.outgoingAccountIndex! < rawStrings.length) {
-            legacyOutgoing = rawStrings[mapping.outgoingAccountIndex!].trim();
-            if (legacyOutgoing.isNotEmpty) {
-              legacyAccountCounts[legacyOutgoing] = (legacyAccountCounts[legacyOutgoing] ?? 0) + 1;
-            }
+            legacyOutgoing = _normalizeCellString(rawStrings[mapping.outgoingAccountIndex!]);
           }
           if (mapping.incomingAccountIndex != null && mapping.incomingAccountIndex! < rawStrings.length) {
-            legacyIncoming = rawStrings[mapping.incomingAccountIndex!].trim();
-            if (legacyIncoming.isNotEmpty) {
-              legacyAccountCounts[legacyIncoming] = (legacyAccountCounts[legacyIncoming] ?? 0) + 1;
-            }
+            legacyIncoming = _normalizeCellString(rawStrings[mapping.incomingAccountIndex!]);
           }
         } else {
           if (mapping.accountIndex != null && mapping.accountIndex! < rawStrings.length) {
-            legacyAccount = rawStrings[mapping.accountIndex!].trim();
-            if (legacyAccount.isNotEmpty) {
-              legacyAccountCounts[legacyAccount] = (legacyAccountCounts[legacyAccount] ?? 0) + 1;
-            }
+            legacyAccount = _normalizeCellString(rawStrings[mapping.accountIndex!]);
           }
           if (mapping.categoryIndex != null && mapping.categoryIndex! < rawStrings.length) {
-            legacyCategory = rawStrings[mapping.categoryIndex!].trim();
-            if (legacyCategory.isNotEmpty) {
-              final catType = sheetType == ExcelSheetType.income ? CategoryType.income : CategoryType.expense;
-              final key = '$legacyCategory|${catType.name}';
-              final existing = legacyCategoryCounts[key];
-              if (existing != null) {
-                legacyCategoryCounts[key] = _CategoryWithCount(name: legacyCategory, type: catType, count: existing.count + 1);
-              } else {
-                legacyCategoryCounts[key] = _CategoryWithCount(name: legacyCategory, type: catType, count: 1);
-              }
-            }
+            legacyCategory = _normalizeCellString(rawStrings[mapping.categoryIndex!]);
+          }
+        }
+
+        // Ignore genuinely empty rows (no date, amount, account, category, or comment)
+        if (parsedDate == null && (parsedMoney == null || parsedMoney.units <= 0) && legacyAccount == null && legacyCategory == null && legacyOutgoing == null && legacyIncoming == null && comment == null) {
+          continue;
+        }
+
+        // Tally category and account counts only for candidate financial rows
+        if (sheetType == ExcelSheetType.transfers) {
+          final outKey = legacyOutgoing ?? 'No account';
+          legacyAccountCounts[outKey] = (legacyAccountCounts[outKey] ?? 0) + 1;
+          final inKey = legacyIncoming ?? 'No account';
+          legacyAccountCounts[inKey] = (legacyAccountCounts[inKey] ?? 0) + 1;
+        } else {
+          final accKey = legacyAccount ?? 'No account';
+          legacyAccountCounts[accKey] = (legacyAccountCounts[accKey] ?? 0) + 1;
+
+          final catType = sheetType == ExcelSheetType.income ? CategoryType.income : CategoryType.expense;
+          final catKey = legacyCategory ?? 'No category';
+          final fullCatKey = '$catKey|${catType.name}';
+          final existing = legacyCategoryCounts[fullCatKey];
+          if (existing != null) {
+            legacyCategoryCounts[fullCatKey] = _CategoryWithCount(name: catKey, type: catType, count: existing.count + 1);
+          } else {
+            legacyCategoryCounts[fullCatKey] = _CategoryWithCount(name: catKey, type: catType, count: 1);
           }
         }
 
@@ -792,56 +888,106 @@ class ExcelImportService {
       final legacyName = entry.key;
       final count = entry.value;
 
-      final matched = _matchAccount(legacyName, existingAccounts);
-      if (matched != null) {
-        accountMappings[legacyName] = AccountMappingEntry(
-          legacyName: legacyName,
-          targetAccountId: matched.target.id,
-          targetAccountName: matched.target.isArchived ? '${matched.target.name} (Deleted)' : matched.target.name,
-          status: matched.status,
-          transactionCount: count,
-          isTargetArchived: matched.target.isArchived,
-        );
+      if (legacyName == 'No account') {
+        final primaryAcc = existingAccounts.where((a) => !a.isArchived).firstOrNull;
+        if (primaryAcc != null) {
+          accountMappings[legacyName] = AccountMappingEntry(
+            legacyName: legacyName,
+            targetAccountId: primaryAcc.id,
+            targetAccountName: primaryAcc.name,
+            status: MappingStatus.suggested,
+            transactionCount: count,
+            isTargetArchived: false,
+          );
+        } else {
+          accountMappings[legacyName] = AccountMappingEntry(
+            legacyName: legacyName,
+            targetAccountId: null,
+            targetAccountName: null,
+            status: MappingStatus.unmapped,
+            transactionCount: count,
+            isTargetArchived: false,
+          );
+        }
       } else {
-        // Genuinely new account: Default to "Create New" (pending creation until final import confirmation)
-        accountMappings[legacyName] = AccountMappingEntry(
-          legacyName: legacyName,
-          targetAccountId: IdGenerator.generate(),
-          targetAccountName: legacyName,
-          status: MappingStatus.createNew,
-          transactionCount: count,
-          isTargetArchived: false,
-        );
+        final matched = _matchAccount(legacyName, existingAccounts);
+        if (matched != null) {
+          accountMappings[legacyName] = AccountMappingEntry(
+            legacyName: legacyName,
+            targetAccountId: matched.target.id,
+            targetAccountName: matched.target.isArchived ? '${matched.target.name} (Deleted)' : matched.target.name,
+            status: matched.status,
+            transactionCount: count,
+            isTargetArchived: matched.target.isArchived,
+          );
+        } else {
+          accountMappings[legacyName] = AccountMappingEntry(
+            legacyName: legacyName,
+            targetAccountId: IdGenerator.generate(),
+            targetAccountName: legacyName,
+            status: MappingStatus.createNew,
+            transactionCount: count,
+            isTargetArchived: false,
+          );
+        }
       }
     }
 
-    // 5. Classify Category Mappings (Exact Match, Suggested Match, Default Create New for brand new)
+    // 5. Classify Category Mappings (Exact Match, Suggested Match, Create New)
     final categoryMappings = <String, CategoryMappingEntry>{};
     for (final entry in legacyCategoryCounts.values) {
       final legacyName = entry.name;
       final expectedType = entry.type;
       final count = entry.count;
+      final key = '$legacyName|${expectedType.name}';
 
-      final matched = _matchCategory(legacyName, expectedType, existingCategories);
-      if (matched != null) {
-        categoryMappings[legacyName] = CategoryMappingEntry(
-          legacyName: legacyName,
-          targetCategoryId: matched.target.id,
-          targetCategoryName: matched.target.name,
-          categoryType: expectedType,
-          status: matched.status,
-          transactionCount: count,
-        );
+      if (legacyName == 'No category') {
+        final sameTypeCategories = existingCategories.where((c) => c.type == expectedType && !c.isArchived).toList();
+        final defaultCat = sameTypeCategories.where((c) {
+          final n = c.name.toLowerCase();
+          return n == 'other' || n == 'other expense' || n == 'other income' || n == 'general' || n == 'uncategorized' || n == 'miscellaneous';
+        }).firstOrNull ?? (sameTypeCategories.isNotEmpty ? sameTypeCategories.first : null);
+
+        if (defaultCat != null) {
+          categoryMappings[key] = CategoryMappingEntry(
+            legacyName: legacyName,
+            targetCategoryId: defaultCat.id,
+            targetCategoryName: defaultCat.name,
+            categoryType: expectedType,
+            status: MappingStatus.suggested,
+            transactionCount: count,
+          );
+        } else {
+          categoryMappings[key] = CategoryMappingEntry(
+            legacyName: legacyName,
+            targetCategoryId: IdGenerator.generate(),
+            targetCategoryName: expectedType == CategoryType.income ? 'Other Income' : 'Other Expense',
+            categoryType: expectedType,
+            status: MappingStatus.createNew,
+            transactionCount: count,
+          );
+        }
       } else {
-        // Genuinely new category: Default to "Create New" (pending creation until final import confirmation)
-        categoryMappings[legacyName] = CategoryMappingEntry(
-          legacyName: legacyName,
-          targetCategoryId: IdGenerator.generate(),
-          targetCategoryName: legacyName,
-          categoryType: expectedType,
-          status: MappingStatus.createNew,
-          transactionCount: count,
-        );
+        final matched = _matchCategory(legacyName, expectedType, existingCategories);
+        if (matched != null) {
+          categoryMappings[key] = CategoryMappingEntry(
+            legacyName: legacyName,
+            targetCategoryId: matched.target.id,
+            targetCategoryName: matched.target.name,
+            categoryType: expectedType,
+            status: matched.status,
+            transactionCount: count,
+          );
+        } else {
+          categoryMappings[key] = CategoryMappingEntry(
+            legacyName: legacyName,
+            targetCategoryId: IdGenerator.generate(),
+            targetCategoryName: legacyName,
+            categoryType: expectedType,
+            status: MappingStatus.createNew,
+            transactionCount: count,
+          );
+        }
       }
     }
 
@@ -1070,8 +1216,12 @@ class ExcelImportService {
       }
 
       if (currentSheetType == ExcelSheetType.transfers) {
-        final outName = row.legacyOutgoingAccount ?? '';
-        final inName = row.legacyIncomingAccount ?? '';
+        final outName = (row.legacyOutgoingAccount != null && row.legacyOutgoingAccount!.trim().isNotEmpty)
+            ? row.legacyOutgoingAccount!.trim()
+            : 'No account';
+        final inName = (row.legacyIncomingAccount != null && row.legacyIncomingAccount!.trim().isNotEmpty)
+            ? row.legacyIncomingAccount!.trim()
+            : 'No account';
 
         final outMapping = accountMappings[outName];
         final inMapping = accountMappings[inName];
@@ -1157,38 +1307,83 @@ class ExcelImportService {
         validMonthlyCoverage[monthKey] = (validMonthlyCoverage[monthKey] ?? 0) + 1;
       } else {
         // Expenses or Income
-        final accName = row.legacyAccount ?? '';
-        final catName = row.legacyCategory ?? 'Other';
-
+        final accName = (row.legacyAccount != null && row.legacyAccount!.trim().isNotEmpty)
+            ? row.legacyAccount!.trim()
+            : 'No account';
         final accMapping = accountMappings[accName];
-        final catMapping = categoryMappings[catName] ??
-            (categoryMappings.isNotEmpty ? categoryMappings.values.first : null);
 
-        if (accMapping == null || catMapping == null) {
+        if (accMapping == null) {
           invalidRows.add(InvalidRowInfo(
             sheetName: currentSheetName,
             rowNumber: rowNum,
-            errorReason: 'Missing Mapping (Account: "$accName", Category: "$catName")',
+            errorReason: 'Missing Account mapping ("$accName")',
             rawValues: row.rawStrings,
           ));
           continue;
         }
 
-        if (accMapping.status == MappingStatus.ignored || catMapping.status == MappingStatus.ignored) {
+        if (accMapping.status == MappingStatus.ignored) {
           invalidRows.add(InvalidRowInfo(
             sheetName: currentSheetName,
             rowNumber: rowNum,
-            errorReason: 'Skipped: Mapped to Ignore',
+            errorReason: 'Skipped: Account mapped to Ignore',
             rawValues: row.rawStrings,
           ));
           continue;
         }
 
-        if (accMapping.targetAccountId == null || catMapping.targetCategoryId == null) {
+        if (accMapping.targetAccountId == null) {
           invalidRows.add(InvalidRowInfo(
             sheetName: currentSheetName,
             rowNumber: rowNum,
-            errorReason: 'Unmapped Account ("$accName") or Category ("$catName")',
+            errorReason: 'Unmapped Account ("$accName")',
+            rawValues: row.rawStrings,
+          ));
+          continue;
+        }
+
+        final targetCategoryType = currentSheetType == ExcelSheetType.income ? CategoryType.income : CategoryType.expense;
+        String? mappedCatId;
+        String? mappedCatName;
+        final rawCatName = row.legacyCategory;
+        final lookupName = (rawCatName != null && rawCatName.trim().isNotEmpty) ? rawCatName.trim() : 'No category';
+
+        final catMapping = categoryMappings['$lookupName|${targetCategoryType.name}'] ??
+            categoryMappings.values.where((c) => c.legacyName.trim().toLowerCase() == lookupName.toLowerCase() && c.categoryType == targetCategoryType).firstOrNull ??
+            categoryMappings[lookupName];
+        if (catMapping != null) {
+          if (catMapping.status == MappingStatus.ignored) {
+            invalidRows.add(InvalidRowInfo(
+              sheetName: currentSheetName,
+              rowNumber: rowNum,
+              errorReason: 'Skipped: Category mapped to Ignore',
+              rawValues: row.rawStrings,
+            ));
+            continue;
+          }
+          mappedCatId = catMapping.targetCategoryId;
+          mappedCatName = catMapping.targetCategoryName ?? (lookupName == 'No category' ? (targetCategoryType == CategoryType.income ? 'Other Income' : 'Other Expense') : lookupName);
+        }
+
+        // Fallback for blank/unspecified category or unresolved category matching transaction type
+        if (mappedCatId == null || mappedCatName == null || mappedCatName.trim().isEmpty) {
+          final matchingCategories = analysis.existingCategories.where((c) => c.type == targetCategoryType && !c.isArchived).toList();
+          final defaultCat = matchingCategories.where((c) {
+            final n = c.name.toLowerCase();
+            return n == 'other' || n == 'other expense' || n == 'other income' || n == 'general' || n == 'miscellaneous' || n == 'uncategorized';
+          }).firstOrNull ?? (matchingCategories.isNotEmpty ? matchingCategories.first : null);
+
+          if (defaultCat != null) {
+            mappedCatId = defaultCat.id;
+            mappedCatName = defaultCat.name;
+          }
+        }
+
+        if (mappedCatId == null || mappedCatName == null || mappedCatName.trim().isEmpty) {
+          invalidRows.add(InvalidRowInfo(
+            sheetName: currentSheetName,
+            rowNumber: rowNum,
+            errorReason: 'Unresolved Category for transaction',
             rawValues: row.rawStrings,
           ));
           continue;
@@ -1196,7 +1391,7 @@ class ExcelImportService {
 
         final typeKey = currentSheetType == ExcelSheetType.income ? 'INCOME' : 'EXPENSE';
         final dateKey = '${row.parsedDate!.year}-${row.parsedDate!.month.toString().padLeft(2, "0")}-${row.parsedDate!.day.toString().padLeft(2, "0")}';
-        final sig = '$dateKey|$typeKey|${row.parsedAmount!.units}|${accMapping.targetAccountName!.toLowerCase()}|${catMapping.targetCategoryName!.toLowerCase()}|${(row.comment ?? "").trim().toLowerCase()}';
+        final sig = '$dateKey|$typeKey|${row.parsedAmount!.units}|${accMapping.targetAccountName!.toLowerCase()}|${mappedCatName.toLowerCase()}|${(row.comment ?? "").trim().toLowerCase()}';
         bool isDup = false;
         final availableCount = availableTxSignatures[sig] ?? 0;
         if (availableCount > 0) {
@@ -1208,9 +1403,9 @@ class ExcelImportService {
           sheetName: currentSheetName,
           rowNumber: rowNum,
           date: row.parsedDate!,
-          legacyCategory: catName,
-          mappedCategoryId: catMapping.targetCategoryId,
-          mappedCategoryName: catMapping.targetCategoryName,
+          legacyCategory: lookupName,
+          mappedCategoryId: mappedCatId,
+          mappedCategoryName: mappedCatName,
           legacyAccount: accName,
           mappedAccountId: accMapping.targetAccountId,
           mappedAccountName: accMapping.targetAccountName,
@@ -1282,9 +1477,13 @@ class ExcelImportService {
       await db.transaction((txn) async {
         final now = DateTime.now();
 
-        // 1. Persist pending newly created accounts (if chosen by user/defaulted)
+        // 1. Persist pending newly created accounts (only if explicitly configured as createNew)
         for (final accEntry in preview.finalAccountMappings.values) {
-          if (accEntry.targetAccountId != null && accEntry.status != MappingStatus.ignored) {
+          if (accEntry.status == MappingStatus.createNew && accEntry.targetAccountId != null) {
+            final rawAccName = (accEntry.targetAccountName ?? accEntry.legacyName).trim();
+            if (rawAccName.isEmpty || rawAccName.toLowerCase() == 'null' || rawAccName.toLowerCase() == 'undefined' || rawAccName == 'No account') continue;
+            final resolvedAccName = rawAccName;
+
             final exists = await txn.query(
               DbTables.accounts,
               where: '${DbColumns.id} = ?',
@@ -1293,7 +1492,7 @@ class ExcelImportService {
             if (exists.isEmpty) {
               await txn.insert(DbTables.accounts, {
                 DbColumns.id: accEntry.targetAccountId,
-                DbColumns.name: accEntry.targetAccountName ?? accEntry.legacyName,
+                DbColumns.name: resolvedAccName,
                 DbColumns.accountType: 'BANK',
                 DbColumns.openingBalance: 0,
                 DbColumns.currency: 'INR',
@@ -1307,9 +1506,15 @@ class ExcelImportService {
           }
         }
 
-        // 2. Persist pending newly created categories (if chosen by user/defaulted)
+        // 2. Persist pending newly created categories (only if explicitly configured as createNew)
         for (final catEntry in preview.finalCategoryMappings.values) {
-          if (catEntry.targetCategoryId != null && catEntry.status != MappingStatus.ignored) {
+          if (catEntry.status == MappingStatus.createNew && catEntry.targetCategoryId != null) {
+            final rawCatName = (catEntry.targetCategoryName ?? catEntry.legacyName).trim();
+            if (rawCatName.isEmpty || rawCatName.toLowerCase() == 'null' || rawCatName.toLowerCase() == 'undefined') continue; // Never insert empty category
+            final resolvedCatName = (rawCatName == 'No category')
+                ? (catEntry.categoryType == CategoryType.income ? 'Other Income' : 'Other Expense')
+                : rawCatName;
+
             final exists = await txn.query(
               DbTables.categories,
               where: '${DbColumns.id} = ?',
@@ -1318,7 +1523,7 @@ class ExcelImportService {
             if (exists.isEmpty) {
               await txn.insert(DbTables.categories, {
                 DbColumns.id: catEntry.targetCategoryId,
-                DbColumns.name: catEntry.targetCategoryName ?? catEntry.legacyName,
+                DbColumns.name: resolvedCatName,
                 DbColumns.type: catEntry.categoryType.toDbString(),
                 DbColumns.icon: catEntry.categoryType == CategoryType.income ? 'payments_outlined' : 'category_outlined',
                 DbColumns.color: catEntry.categoryType == CategoryType.income ? 0xFF059669 : 0xFF2563EB,

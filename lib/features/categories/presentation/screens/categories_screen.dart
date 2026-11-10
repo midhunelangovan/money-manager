@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_category_icon.dart';
 import '../../../../core/widgets/app_drawer.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_text_field.dart';
@@ -14,12 +15,14 @@ class CategoriesScreen extends StatefulWidget {
   final bool isPickerMode;
   final ValueChanged<Category>? onCategorySelected;
   final CategoryType? initialType;
+  final String? selectedCategoryId;
 
   const CategoriesScreen({
     super.key,
     this.isPickerMode = false,
     this.onCategorySelected,
     this.initialType,
+    this.selectedCategoryId,
   });
 
   @override
@@ -29,6 +32,7 @@ class CategoriesScreen extends StatefulWidget {
 class _CategoriesScreenState extends State<CategoriesScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late LedgerTabType _selectedTab;
+  String? _selectedCategoryId;
   bool _isSearching = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -36,6 +40,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedCategoryId = widget.selectedCategoryId;
     _selectedTab = (widget.initialType == CategoryType.income)
         ? LedgerTabType.income
         : LedgerTabType.expenses;
@@ -166,12 +171,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                             itemCount: categories.length,
                             itemBuilder: (context, index) {
                               final cat = categories[index];
-                              final color = cat.color != null ? Color(cat.color!) : AppColors.primary;
+                              final color = cat.color != null ? Color(cat.color!) : const Color(0xFF475569);
+                              final isSelected = widget.isPickerMode && cat.id == _selectedCategoryId;
 
                               return GestureDetector(
                                 onTap: () async {
-                                  if (widget.isPickerMode && widget.onCategorySelected != null) {
-                                    widget.onCategorySelected!(cat);
+                                  if (widget.isPickerMode) {
+                                    setState(() => _selectedCategoryId = cat.id);
+                                    widget.onCategorySelected?.call(cat);
                                     Navigator.pop(context, cat);
                                   } else {
                                     final catProv = context.read<CategoryProvider>();
@@ -190,25 +197,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Container(
-                                      width: 54,
-                                      height: 54,
-                                      decoration: BoxDecoration(
-                                        color: color.withValues(alpha: 0.15),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: color.withValues(alpha: 0.4),
-                                          width: 1.2,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: color.withValues(alpha: 0.15),
-                                            blurRadius: 6,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Icon(cat.iconData, color: color, size: 26),
+                                    AppCategoryIcon(
+                                      icon: cat.iconData,
+                                      color: color,
+                                      size: 50,
+                                      iconSize: 28,
+                                      isSelected: isSelected,
                                     ),
                                     const SizedBox(height: 6),
                                     SizedBox(
@@ -217,8 +211,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                         cat.name,
                                         style: TextStyle(
                                           fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                                          color: isSelected
+                                              ? (isDark ? AppColors.darkPrimary : AppColors.primary)
+                                              : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
                                           height: 1.15,
                                         ),
                                         textAlign: TextAlign.center,
@@ -258,13 +254,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   catProv.loadCategories();
                 }
               },
-              icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
-              label: const Text(
+              icon: Icon(Icons.add_rounded, color: isDark ? AppColors.darkBackground : Colors.white, size: 22),
+              label: Text(
                 'Create',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? AppColors.darkBackground : Colors.white),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: isDark ? Theme.of(context).colorScheme.primary : AppColors.primary,
+                foregroundColor: isDark ? AppColors.darkBackground : Colors.white,
                 minimumSize: const Size.fromHeight(52),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 3,

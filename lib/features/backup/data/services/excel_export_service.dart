@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
-import 'package:path/path.dart' as p;
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utilities/date_formatter.dart';
 import '../../../../core/utilities/storage_helper.dart';
@@ -14,12 +13,18 @@ import '../../../transfers/domain/repositories/transfer_repository.dart';
 class ExcelExportFilter {
   final DateTime? startDate;
   final DateTime? endDate;
+  final bool exclusiveEndDate;
   final String? accountId;
+  final LedgerItemType? typeFilter;
+  final String? customFileName;
 
   const ExcelExportFilter({
     this.startDate,
     this.endDate,
+    this.exclusiveEndDate = false,
     this.accountId,
+    this.typeFilter,
+    this.customFileName,
   });
 }
 
@@ -43,18 +48,33 @@ class ExcelExportService {
     // Default sheet is usually Sheet1, rename or replace
     final defaultSheet = excel.getDefaultSheet() ?? 'Sheet1';
 
-    // 1. Summary Sheet
+    // 1. Fetch matching transactions first so summary and transactions match exactly
+    final ledgerItems = await transactionRepository.getUnifiedLedger(
+      accountId: filter?.accountId,
+      startDate: filter?.startDate,
+      endDate: filter?.endDate,
+      exclusiveEndDate: filter?.exclusiveEndDate ?? false,
+      typeFilter: filter?.typeFilter,
+      limit: 100000,
+    );
+
+    var totalIncome = 0.0;
+    var totalExpense = 0.0;
+    for (final item in ledgerItems) {
+      if (item.itemType == LedgerItemType.income) {
+        totalIncome += item.amount.toDoubleForDisplay();
+      } else if (item.itemType == LedgerItemType.expense) {
+        totalExpense += item.amount.toDoubleForDisplay();
+      }
+    }
+    final netIncome = totalIncome - totalExpense;
+
+    // 2. Summary Sheet
     final summarySheet = excel['Summary'];
     excel.setDefaultSheet('Summary');
     if (defaultSheet != 'Summary' && excel.sheets.containsKey(defaultSheet)) {
       excel.delete(defaultSheet);
     }
-
-    final summary = await transactionRepository.getSummary(
-      startDate: filter?.startDate,
-      endDate: filter?.endDate,
-      accountId: filter?.accountId,
-    );
 
     summarySheet.appendRow([
       TextCellValue("Kal's Money Manager - Financial Report"),
@@ -63,10 +83,20 @@ class ExcelExportService {
       TextCellValue('Generated on: ${DateFormatter.formatIsoDateTime(DateTime.now())}'),
     ]);
     if (filter?.startDate != null || filter?.endDate != null) {
+      final endLabel = filter?.endDate != null
+          ? DateFormatter.format(filter!.exclusiveEndDate
+              ? filter.endDate!.subtract(const Duration(milliseconds: 1))
+              : filter.endDate!)
+          : 'Present';
       summarySheet.appendRow([
         TextCellValue(
-          'Date Range: ${filter?.startDate != null ? DateFormatter.format(filter!.startDate!) : "All Time"} to ${filter?.endDate != null ? DateFormatter.format(filter!.endDate!) : "Present"}',
+          'Date Range: ${filter?.startDate != null ? DateFormatter.format(filter!.startDate!) : "All Time"} to $endLabel',
         ),
+      ]);
+    }
+    if (filter?.typeFilter != null) {
+      summarySheet.appendRow([
+        TextCellValue('Transaction Type: ${filter!.typeFilter!.displayName}'),
       ]);
     }
     summarySheet.appendRow([TextCellValue('')]);
@@ -77,22 +107,22 @@ class ExcelExportService {
     ]);
     summarySheet.appendRow([
       TextCellValue('Total Income'),
-      DoubleCellValue(summary.totalIncome.toDoubleForDisplay()),
+      DoubleCellValue(totalIncome),
     ]);
     summarySheet.appendRow([
       TextCellValue('Total Expense'),
-      DoubleCellValue(summary.totalExpense.toDoubleForDisplay()),
+      DoubleCellValue(totalExpense),
     ]);
     summarySheet.appendRow([
       TextCellValue('Net Savings / Change'),
-      DoubleCellValue(summary.netIncome.toDoubleForDisplay()),
+      DoubleCellValue(netIncome),
     ]);
     summarySheet.appendRow([
       TextCellValue('Total Transactions Count'),
-      IntCellValue(summary.transactionCount),
+      IntCellValue(ledgerItems.length),
     ]);
 
-    // 2. Transactions Sheet (All transactions + transfers within selected duration)
+    // 3. Transactions Sheet (matching transactions within selected scope)
     final txSheet = excel['Transactions'];
     txSheet.appendRow([
       TextCellValue('Date'),
@@ -104,13 +134,6 @@ class ExcelExportService {
       TextCellValue('Comment'),
       TextCellValue('Attachment'),
     ]);
-
-    final ledgerItems = await transactionRepository.getUnifiedLedger(
-      accountId: filter?.accountId,
-      startDate: filter?.startDate,
-      endDate: filter?.endDate,
-      limit: 100000,
-    );
 
     for (final item in ledgerItems) {
       final accountDisplay = item.type == LedgerItemType.transfer
@@ -182,31 +205,33 @@ class ExcelExportService {
       ]);
     }
 
-    // 5. Transfers Sheet
-    final trSheet = excel['Transfers'];
-    trSheet.appendRow([
-      TextCellValue('Date'),
-      TextCellValue('From Account'),
-      TextCellValue('To Account'),
-      TextCellValue('Amount (INR)'),
-      TextCellValue('Description'),
-      TextCellValue('Created At'),
-    ]);
-    final transfers = await transferRepository.getAllTransfers(
-      startDate: filter?.startDate,
-      endDate: filter?.endDate,
-      accountId: filter?.accountId,
-      limit: 50000,
-    );
-    for (final tr in transfers) {
+    // 5. Transfers Sheet (Included only if typeFilter is null or transfer)
+    if (filter?.typeFilter == null || filter?.typeFilter == LedgerItemType.transfer) {
+      final trSheet = excel['Transfers'];
       trSheet.appendRow([
-        TextCellValue(DateFormatter.format(tr.date)),
-        TextCellValue(tr.fromAccountName ?? tr.fromAccountId),
-        TextCellValue(tr.toAccountName ?? tr.toAccountId),
-        DoubleCellValue(tr.amount.toDoubleForDisplay()),
-        TextCellValue(tr.description),
-        TextCellValue(DateFormatter.formatIsoDateTime(tr.createdAt)),
+        TextCellValue('Date'),
+        TextCellValue('From Account'),
+        TextCellValue('To Account'),
+        TextCellValue('Amount (INR)'),
+        TextCellValue('Description'),
+        TextCellValue('Created At'),
       ]);
+      final transfers = await transferRepository.getAllTransfers(
+        startDate: filter?.startDate,
+        endDate: filter?.endDate,
+        accountId: filter?.accountId,
+        limit: 50000,
+      );
+      for (final tr in transfers) {
+        trSheet.appendRow([
+          TextCellValue(DateFormatter.format(tr.date)),
+          TextCellValue(tr.fromAccountName ?? tr.fromAccountId),
+          TextCellValue(tr.toAccountName ?? tr.toAccountId),
+          DoubleCellValue(tr.amount.toDoubleForDisplay()),
+          TextCellValue(tr.description),
+          TextCellValue(DateFormatter.formatIsoDateTime(tr.createdAt)),
+        ]);
+      }
     }
 
     // 6. Recurring Transactions Sheet
@@ -241,21 +266,30 @@ class ExcelExportService {
     }
 
     final now = DateTime.now();
-    final fileName = 'MoneyManager_Export_${DateFormatter.formatBackupStamp(now)}${AppConstants.excelFileExtension}';
-
-    final exportDir = await StorageHelper.getDownloadsDirectory();
-    if (!await exportDir.exists()) {
-      await exportDir.create(recursive: true);
+    final String fileName;
+    if (filter?.customFileName != null && filter!.customFileName!.trim().isNotEmpty) {
+      fileName = filter.customFileName!.endsWith(AppConstants.excelFileExtension)
+          ? filter.customFileName!
+          : '${filter.customFileName}${AppConstants.excelFileExtension}';
+    } else if (filter?.startDate != null && filter?.endDate != null) {
+      final s = filter!.startDate!;
+      final e = filter.exclusiveEndDate ? filter.endDate!.subtract(const Duration(milliseconds: 1)) : filter.endDate!;
+      final sStr = '${s.year}-${s.month.toString().padLeft(2, '0')}-${s.day.toString().padLeft(2, '0')}';
+      final eStr = '${e.year}-${e.month.toString().padLeft(2, '0')}-${e.day.toString().padLeft(2, '0')}';
+      if (sStr == eStr) {
+        fileName = 'Kals_Transactions_$sStr${AppConstants.excelFileExtension}';
+      } else {
+        fileName = 'Kals_Transactions_${sStr}_to_$eStr${AppConstants.excelFileExtension}';
+      }
+    } else {
+      fileName = 'Kals_Transactions_${DateFormatter.formatBackupStamp(now)}${AppConstants.excelFileExtension}';
     }
 
-    final file = File(p.join(exportDir.path, fileName));
-    await file.writeAsBytes(fileBytes, flush: true);
-
-    // Verify file creation and non-zero size
-    final isValid = await StorageHelper.verifyFileExistsAndNonEmpty(file);
-    if (!isValid) {
-      throw Exception('Export failed: file could not be verified in storage');
-    }
+    final file = await StorageHelper.saveToPublicDownloads(
+      bytes: fileBytes,
+      fileName: fileName,
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
 
     return file;
   }
