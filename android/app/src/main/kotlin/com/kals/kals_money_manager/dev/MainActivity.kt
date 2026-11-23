@@ -1,4 +1,4 @@
-package com.kals.kals_money_manager
+package com.kals.kals_money_manager.dev
 
 import android.app.DownloadManager
 import android.content.ContentValues
@@ -16,7 +16,7 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
 
-    private val CHANNEL = "com.kals.kals_money_manager/widget_channel"
+    private val CHANNEL = "com.kals.kals_money_manager.dev/widget_channel"
     private var methodChannel: MethodChannel? = null
     private var initialAction: String? = null
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/constants/app_constants.dart';
 import 'core/database/app_database.dart';
 import 'core/navigation/navigation_service.dart';
 import 'core/services/notification_service.dart';
@@ -138,7 +139,7 @@ class MoneyManagerApp extends StatelessWidget {
 
     return MaterialApp(
       navigatorKey: MainNavigationService.navigatorKey,
-      title: "Kal's Money Manager",
+      title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       themeMode: settings.themeMode,
       theme: AppTheme.lightTheme(settings.accentColor),

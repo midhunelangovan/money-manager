@@ -9,7 +9,7 @@ import '../../features/backup/presentation/screens/export_history_screen.dart';
 
 class StorageHelper {
   static const MethodChannel _platformChannel =
-      MethodChannel('com.kals.kals_money_manager/widget_channel');
+      MethodChannel('com.kals.kals_money_manager.dev/widget_channel');
 
   /// Optional custom user-selected export destination directory.
   static String? customExportDirectory;

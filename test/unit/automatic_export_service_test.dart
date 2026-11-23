@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kals_money_manager/core/constants/app_constants.dart';
 import 'package:kals_money_manager/core/database/app_database.dart';
 import 'package:kals_money_manager/core/database/database_migrations.dart';
 import 'package:kals_money_manager/features/accounts/data/repositories/account_repository_impl.dart';
@@ -226,7 +227,7 @@ void main() {
       // Read and validate content
       final content = await result.file!.readAsString();
       final payload = backupService.validateBackupData(content);
-      expect(payload.metadata.appVersion, equals('1.0.0'));
+      expect(payload.metadata.appVersion, equals(AppConstants.appVersion));
       expect(payload.metadata.checksum, isNotNull);
     });
   });

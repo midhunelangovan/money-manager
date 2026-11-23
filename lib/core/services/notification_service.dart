@@ -18,12 +18,12 @@ class NotificationService {
   bool _isInitialized = false;
   static bool isTestMode = false;
 
-  static const String channelId = 'kals_reminders_channel';
-  static const String channelName = 'Personal Reminders';
+  static const String channelId = 'kals_reminders_channel_v2';
+  static const String channelName = 'Personal Reminders Dev';
   static const String channelDescription = 'Offline personal reminders and financial alerts';
 
-  static const String exportChannelId = 'kals_exports_channel';
-  static const String exportChannelName = 'Export & Backup Reports';
+  static const String exportChannelId = 'kals_exports_channel_v2';
+  static const String exportChannelName = 'Export & Backup Reports Dev';
   static const String exportChannelDescription = 'Status notifications when scheduled or manual exports complete';
 
   Future<void> initialize() async {
@@ -236,9 +236,10 @@ class NotificationService {
   /// Guarantees that across process restarts and OS reboots, the same reminder ID
   /// always maps to the exact same notification/alarm ID.
   static int getNotificationId(String id) {
+    final namespacedId = 'v2_$id';
     var hash = 0x811c9dc5;
-    for (int i = 0; i < id.length; i++) {
-      hash ^= id.codeUnitAt(i);
+    for (int i = 0; i < namespacedId.length; i++) {
+      hash ^= namespacedId.codeUnitAt(i);
       hash = (hash * 0x01000193) & 0x7FFFFFFF;
     }
     return hash == 0 ? 1 : hash;

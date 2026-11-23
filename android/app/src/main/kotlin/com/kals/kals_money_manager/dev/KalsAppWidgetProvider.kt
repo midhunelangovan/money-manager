@@ -1,4 +1,4 @@
-package com.kals.kals_money_manager
+package com.kals.kals_money_manager.dev
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -20,8 +20,8 @@ class KalsAppWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        const val ACTION_ADD_EXPENSE = "com.kals.kals_money_manager.ADD_EXPENSE"
-        const val ACTION_ADD_INCOME = "com.kals.kals_money_manager.ADD_INCOME"
+        const val ACTION_ADD_EXPENSE = "com.kals.kals_money_manager.dev.ADD_EXPENSE"
+        const val ACTION_ADD_INCOME = "com.kals.kals_money_manager.dev.ADD_INCOME"
 
         fun updateAppWidget(
             context: Context,
