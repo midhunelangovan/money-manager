@@ -331,14 +331,14 @@ class _ExportHistoryScreenState extends State<ExportHistoryScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isExcel
+                  color: (isExcel && !AppColors.isMinimalMode)
                       ? const Color(0xFF059669).withValues(alpha: 0.15)
                       : primaryAccent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   isExcel ? Icons.table_chart_rounded : Icons.backup_rounded,
-                  color: isExcel ? const Color(0xFF059669) : primaryAccent,
+                  color: (isExcel && !AppColors.isMinimalMode) ? const Color(0xFF059669) : primaryAccent,
                   size: 22,
                 ),
               ),
@@ -533,7 +533,7 @@ class _ExportHistoryScreenState extends State<ExportHistoryScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
               onPressed: () {
-                Navigator.of(context).push(
+                Navigator.of(context).pushReplacement(
                   MaterialPageRoute(builder: (_) => const ExportTransactionsScreen()),
                 );
               },

@@ -1,14 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/navigation/navigation_service.dart';
 import '../../../../core/services/attachment_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_logger.dart';
 import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/id_generator.dart';
+import '../../../../core/utilities/indian_number_formatter.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/app_bottom_button.dart';
 import '../../../../core/widgets/app_category_icon.dart';
@@ -62,7 +63,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   String? _selectedAccountId;
   String? _selectedDestinationAccountId;
   String? _selectedCategoryId;
-  String? _receiptPath;
+  List<String> _receiptPaths = [];
   bool _isSaving = false;
   DateTime? _createdAt;
 
@@ -74,7 +75,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   String? _initialAccountId;
   String? _initialDestinationAccountId;
   String? _initialCategoryId;
-  String? _initialReceiptPath;
+  List<String> _initialReceiptPaths = [];
   bool _isSaved = false;
   bool _isShowingDiscardDialog = false;
 
@@ -93,7 +94,11 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
       } else {
         _mode = EntryMode.expense;
       }
-      _amountController = TextEditingController(text: t.amountUnits > 0 ? (t.amountUnits / 100).toStringAsFixed(2) : '');
+      _amountController = TextEditingController(
+        text: t.amountUnits > 0
+            ? IndianNumberFormatter.formatUnits(t.amountUnits, includeDecimals: true, trimZeroDecimals: false)
+            : '',
+      );
       final comment = (t.notes != null && t.notes!.trim().isNotEmpty)
           ? t.notes!.trim()
           : ((t.description.isNotEmpty &&
@@ -108,23 +113,33 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
       _selectedAccountId = t.accountId;
       _selectedDestinationAccountId = t.destinationAccountId;
       _selectedCategoryId = t.categoryId;
-      _receiptPath = t.receiptPath;
+      _receiptPaths = List.from(t.receiptPaths);
       _createdAt = t.createdAt;
     } else if (widget.initialTransfer != null) {
       final tr = widget.initialTransfer!;
       _mode = EntryMode.transfer;
-      _amountController = TextEditingController(text: tr.amount.units > 0 ? (tr.amount.units / 100).toStringAsFixed(2) : '');
+      _amountController = TextEditingController(
+        text: tr.amount.units > 0
+            ? IndianNumberFormatter.formatUnits(tr.amount.units, includeDecimals: true, trimZeroDecimals: false)
+            : '',
+      );
       final comment = (tr.description.isNotEmpty && tr.description != 'Transfer' && tr.description != 'Imported Transfer') ? tr.description : '';
       _descriptionController = TextEditingController(text: comment);
       _selectedDate = tr.date;
       _selectedAccountId = tr.fromAccountId;
       _selectedDestinationAccountId = tr.toAccountId;
-      _receiptPath = tr.receiptPath;
+      _receiptPaths = tr.receiptPath != null && tr.receiptPath!.isNotEmpty
+          ? tr.receiptPath!.split('|').where((s) => s.trim().isNotEmpty).toList()
+          : [];
       _createdAt = tr.createdAt;
     } else if (widget.initialTransaction != null) {
       final tx = widget.initialTransaction!;
       _mode = tx.transactionType == CategoryType.income ? EntryMode.income : EntryMode.expense;
-      _amountController = TextEditingController(text: tx.amount.units > 0 ? (tx.amount.units / 100).toStringAsFixed(2) : '');
+      _amountController = TextEditingController(
+        text: tx.amount.units > 0
+            ? IndianNumberFormatter.formatUnits(tx.amount.units, includeDecimals: true, trimZeroDecimals: false)
+            : '',
+      );
       final comment = (tx.notes != null && tx.notes!.trim().isNotEmpty)
           ? tx.notes!.trim()
           : ((tx.description.isNotEmpty && tx.description != (tx.categoryName ?? '') && tx.description != 'Imported')
@@ -134,7 +149,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
       _selectedDate = tx.date;
       _selectedAccountId = tx.accountId;
       _selectedCategoryId = tx.categoryId;
-      _receiptPath = tx.receiptPath;
+      _receiptPaths = List.from(tx.receiptPaths);
       _createdAt = tx.createdAt;
     } else {
       _mode = widget.initialMode;
@@ -142,6 +157,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
       _descriptionController = TextEditingController();
       _selectedDate = widget.initialDate ?? DateTime.now();
       _selectedAccountId = widget.initialAccountId;
+      _receiptPaths = [];
       _createdAt = DateTime.now();
     }
 
@@ -153,7 +169,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     _initialAccountId = _selectedAccountId;
     _initialDestinationAccountId = _selectedDestinationAccountId;
     _initialCategoryId = _selectedCategoryId;
-    _initialReceiptPath = _receiptPath;
+    _initialReceiptPaths = List.from(_receiptPaths);
   }
 
   @override
@@ -173,12 +189,15 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   /// Determines whether the user has entered or modified details in the form.
   bool get _isDirty {
     if (_isSaved) return false;
+    final currentAmountClean = IndianNumberFormatter.clean(_amountController.text);
+    final initialAmountClean = IndianNumberFormatter.clean(_initialAmountText);
+
     if (!_isEditing) {
-      final hasAmount = _amountController.text.trim().isNotEmpty &&
-          (double.tryParse(_amountController.text.trim()) ?? 0.0) > 0;
+      final hasAmount = currentAmountClean.isNotEmpty &&
+          (double.tryParse(currentAmountClean) ?? 0.0) > 0;
       final hasDescription = _descriptionController.text.trim().isNotEmpty;
       final hasCategory = _selectedCategoryId != null;
-      final hasReceipt = _receiptPath != null && _receiptPath!.isNotEmpty;
+      final hasReceipt = _receiptPaths.isNotEmpty;
       final modeChanged = _mode != _initialMode;
       final dateChanged = !_isSameDay(_selectedDate, _initialDate);
       final accountChanged = _initialAccountId != null && _selectedAccountId != _initialAccountId;
@@ -193,14 +212,14 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
           accountChanged ||
           destAccountChanged;
     } else {
-      final amountChanged = _amountController.text.trim() != _initialAmountText;
+      final amountChanged = currentAmountClean != initialAmountClean;
       final descChanged = _descriptionController.text.trim() != _initialDescriptionText;
       final modeChanged = _mode != _initialMode;
       final catChanged = _selectedCategoryId != _initialCategoryId;
       final accChanged = _selectedAccountId != _initialAccountId;
       final destAccChanged = _selectedDestinationAccountId != _initialDestinationAccountId;
       final dateChanged = !_isSameDay(_selectedDate, _initialDate);
-      final receiptChanged = _receiptPath != _initialReceiptPath;
+      final receiptChanged = _receiptPaths.join('|') != _initialReceiptPaths.join('|');
 
       return amountChanged ||
           descChanged ||
@@ -226,7 +245,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   }
 
   Future<void> _confirmDeleteTransaction() async {
-    if (!_isEditing) return;
+    if (!_isEditing || _isSaving) return;
     final catProvider = context.read<CategoryProvider>();
     final cat = catProvider.categories.where((c) => c.id == _selectedCategoryId).firstOrNull;
     final accProvider = context.read<AccountProvider>();
@@ -251,6 +270,9 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
       final txId = widget.transaction?.id ?? widget.initialTransaction?.id;
       final transferId = widget.transaction?.id ?? widget.initialTransfer?.id;
 
+      setState(() => _isSaving = true);
+      AppLogger.log('KALS_TXN_NAV', 'Starting delete transaction: mode=$_mode, txId=$txId, transferId=$transferId');
+
       try {
         if (_mode == EntryMode.transfer && transferId != null) {
           await transferProvider.deleteTransfer(transferId);
@@ -263,7 +285,13 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
 
         _isSaved = true;
         if (mounted) {
-          Navigator.of(context).pop(true);
+          final route = ModalRoute.of(context);
+          if (route != null && route.isCurrent) {
+            AppLogger.log('KALS_TXN_NAV', 'Popping AddEditTransactionScreen after successful delete');
+            Navigator.of(context).pop(true);
+          } else {
+            AppLogger.log('KALS_TXN_NAV', 'AddEditTransactionScreen is no longer current; skipped delete pop');
+          }
           final rootContext = MainNavigationService.navigatorKey.currentContext;
           if (rootContext != null && rootContext.mounted) {
             final entryLabel = _mode == EntryMode.income
@@ -276,6 +304,8 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
         if (mounted) {
           AppSnackBar.showError(context, 'Failed to delete transaction: $e');
         }
+      } finally {
+        if (mounted) setState(() => _isSaving = false);
       }
     }
   }
@@ -315,11 +345,14 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   }
 
   void _openCalculator() async {
-    final currentVal = double.tryParse(_amountController.text) ?? 0.0;
+    final currentVal = IndianNumberFormatter.parseToDouble(_amountController.text);
     final result = await CalculatorDialog.show(context, initialValue: currentVal);
     if (result != null && mounted) {
       setState(() {
-        _amountController.text = result.toStringAsFixed(result.truncateToDouble() == result ? 0 : 2);
+        _amountController.text = IndianNumberFormatter.formatAmount(
+          result,
+          trimZeroDecimals: result.truncateToDouble() == result,
+        );
       });
     }
   }
@@ -456,7 +489,12 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     );
   }
 
-  void _showImagePickerOptions(BuildContext context) {
+  void _showImagePickerOptions(BuildContext context, {int? replaceIndex}) {
+    if (_receiptPaths.length >= 3 && replaceIndex == null) {
+      AppSnackBar.showInfo(context, 'Maximum 3 photos allowed.');
+      return;
+    }
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -476,7 +514,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: Text(
-                  'Attach Photo',
+                  replaceIndex != null ? 'Change Photo' : 'Attach Photo',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -500,8 +538,14 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
                 onTap: () async {
                   Navigator.pop(ctx);
                   final path = await AttachmentService.pickAndSaveImage(ImageSource.camera);
-                  if (path != null) {
-                    setState(() => _receiptPath = path);
+                  if (path != null && mounted) {
+                    setState(() {
+                      if (replaceIndex != null && replaceIndex < _receiptPaths.length) {
+                        _receiptPaths[replaceIndex] = path;
+                      } else if (_receiptPaths.length < 3) {
+                        _receiptPaths.add(path);
+                      }
+                    });
                   }
                 },
               ),
@@ -520,8 +564,14 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
                 onTap: () async {
                   Navigator.pop(ctx);
                   final path = await AttachmentService.pickAndSaveImage(ImageSource.gallery);
-                  if (path != null) {
-                    setState(() => _receiptPath = path);
+                  if (path != null && mounted) {
+                    setState(() {
+                      if (replaceIndex != null && replaceIndex < _receiptPaths.length) {
+                        _receiptPaths[replaceIndex] = path;
+                      } else if (_receiptPaths.length < 3) {
+                        _receiptPaths.add(path);
+                      }
+                    });
                   }
                 },
               ),
@@ -533,14 +583,19 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   }
 
   Future<void> _save() async {
+    if (_isSaving) {
+      AppLogger.log('KALS_TXN_NAV', 'Duplicate _save() blocked: save already in progress');
+      return;
+    }
+
     final amountText = _amountController.text.trim();
     if (amountText.isEmpty) {
       AppSnackBar.showError(context, 'Please enter an amount.');
       return;
     }
 
-    final amountDouble = double.tryParse(amountText);
-    if (amountDouble == null || amountDouble <= 0) {
+    final amountUnits = IndianNumberFormatter.parseToUnits(amountText);
+    if (amountUnits <= 0) {
       AppSnackBar.showError(context, 'Please enter a valid positive amount.');
       return;
     }
@@ -567,17 +622,17 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     }
 
     setState(() => _isSaving = true);
+    AppLogger.log('KALS_TXN_NAV', 'Started transaction save operation: mode=$_mode');
 
     try {
-      final amountUnits = (amountDouble * 100).round();
       final money = Money.fromUnits(amountUnits);
       final desc = _descriptionController.text.trim();
+      final combinedReceiptPath = _receiptPaths.isEmpty ? null : _receiptPaths.join('|');
 
       final accProvider = context.read<AccountProvider>();
       final catProvider = context.read<CategoryProvider>();
       final txProvider = context.read<TransactionProvider>();
       final transferProvider = context.read<TransferProvider>();
-      final navigator = Navigator.of(context);
 
       String? savedTxId;
       String? savedTransferId;
@@ -594,7 +649,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
           amount: money,
           date: _selectedDate,
           description: desc.isNotEmpty ? desc : 'Transfer',
-          receiptPath: _receiptPath,
+          receiptPath: combinedReceiptPath,
           createdAt: originalCreatedAt,
           updatedAt: DateTime.now(),
         );
@@ -620,7 +675,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
           date: _selectedDate,
           description: desc.isNotEmpty ? desc : (cat?.name ?? 'Transaction'),
           notes: desc.isNotEmpty ? desc : null,
-          receiptPath: _receiptPath,
+          receiptPath: combinedReceiptPath,
           createdAt: originalCreatedAt,
           updatedAt: DateTime.now(),
         );
@@ -639,7 +694,13 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
             : (_mode == EntryMode.income ? 'Income' : 'Transfer');
 
         _isSaved = true;
-        navigator.pop(true);
+        final route = ModalRoute.of(context);
+        if (route != null && route.isCurrent) {
+          AppLogger.log('KALS_TXN_NAV', 'Popping AddEditTransactionScreen after successful save');
+          Navigator.of(context).pop(true);
+        } else {
+          AppLogger.log('KALS_TXN_NAV', 'AddEditTransactionScreen is no longer current; skipped save pop');
+        }
         accProvider.loadAccounts();
         txProvider.loadLedger();
 
@@ -718,10 +779,18 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     return PopScope(
       canPop: !_isDirty || _isSaved,
       onPopInvokedWithResult: (didPop, result) async {
+        AppLogger.log('KALS_TXN_NAV', 'AddEditTransactionScreen PopScope invoked: didPop=$didPop, isDirty=$_isDirty, isSaved=$_isSaved');
         if (didPop) return;
         final shouldDiscard = await _onWillPop();
         if (shouldDiscard && mounted) {
-          Navigator.of(context).pop();
+          _isSaved = true;
+          final route = ModalRoute.of(context);
+          if (route != null && route.isCurrent) {
+            AppLogger.log('KALS_TXN_NAV', 'Popping AddEditTransactionScreen after discard confirmation');
+            Navigator.of(context).pop();
+          } else {
+            AppLogger.log('KALS_TXN_NAV', 'AddEditTransactionScreen was already popped or not current; skipped discard pop');
+          }
         }
       },
       child: Scaffold(
@@ -803,10 +872,10 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
                                     autofocus: !_isEditing,
                                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                     inputFormatters: [
-                                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                      IndianNumberTextInputFormatter(maxDecimalDigits: 2),
                                     ],
                                     style: TextStyle(
-                                      fontSize: 42,
+                                      fontSize: 32,
                                       fontWeight: FontWeight.w700,
                                       color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                                       height: 1.15,
@@ -823,7 +892,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
                                       hoverColor: Colors.transparent,
                                       hintText: '0',
                                       hintStyle: TextStyle(
-                                        fontSize: 42,
+                                        fontSize: 32,
                                         fontWeight: FontWeight.w700,
                                         color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
                                         height: 1.15,
@@ -842,22 +911,22 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
                             Text(
                               currencyCode,
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w700,
                                 color: isDark ? AppColors.darkPrimary : AppColors.primary,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             IconButton(
                               icon: const Icon(Icons.calculate_rounded),
-                              iconSize: 26,
+                              iconSize: 24,
                               color: isDark ? AppColors.darkPrimary : AppColors.primary,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                               onPressed: _openCalculator,
                               tooltip: 'Calculator',
                             ),
@@ -1096,63 +1165,125 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     final isPreviousSelected = selDay == previousDay;
     final isCalendarSelected = !isTodaySelected && !isYesterdaySelected && !isPreviousSelected;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _buildDateTile(
-            dateText: DateFormat('MM/dd').format(today),
-            label: 'today',
-            isSelected: isTodaySelected,
-            onTap: () => setState(() => _selectedDate = today),
-            isDark: isDark,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildDateTile(
-            dateText: DateFormat('MM/dd').format(yesterday),
-            label: 'yesterday',
-            isSelected: isYesterdaySelected,
-            onTap: () => setState(() => _selectedDate = yesterday),
-            isDark: isDark,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildDateTile(
-            dateText: DateFormat('MM/dd').format(previousDay),
-            label: 'previous',
-            isSelected: isPreviousSelected,
-            onTap: () => setState(() => _selectedDate = previousDay),
-            isDark: isDark,
-          ),
-        ),
-        const SizedBox(width: 8),
-        InkWell(
-          onTap: _openDatePicker,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            height: 48,
-            width: 48,
-            decoration: BoxDecoration(
-              color: isCalendarSelected
-                  ? (isDark ? AppColors.darkPrimary : AppColors.primary)
-                  : (isDark ? AppColors.darkSurfaceElevated : const Color(0xFFEFEFEA)),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isCalendarSelected
-                    ? (isDark ? AppColors.darkPrimary : AppColors.primary)
-                    : (isDark ? AppColors.darkBorder : const Color(0xFFE5E4DE)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'DATE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
               ),
             ),
-            child: Icon(
-              Icons.calendar_today_rounded,
-              size: 20,
-              color: isCalendarSelected
-                  ? Colors.white
-                  : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+            InkWell(
+              onTap: _openDatePicker,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.event_note_rounded,
+                      size: 15,
+                      color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      DateFormat('EEE, d MMM yyyy').format(_selectedDate),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDateTile(
+                dateText: DateFormat('MM/dd').format(today),
+                label: 'today',
+                isSelected: isTodaySelected,
+                onTap: () => setState(() => _selectedDate = today),
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildDateTile(
+                dateText: DateFormat('MM/dd').format(yesterday),
+                label: 'yesterday',
+                isSelected: isYesterdaySelected,
+                onTap: () => setState(() => _selectedDate = yesterday),
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildDateTile(
+                dateText: DateFormat('MM/dd').format(previousDay),
+                label: 'previous',
+                isSelected: isPreviousSelected,
+                onTap: () => setState(() => _selectedDate = previousDay),
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: _openDatePicker,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: isCalendarSelected
+                      ? (isDark ? AppColors.darkPrimary : AppColors.primary)
+                      : (isDark ? AppColors.darkSurfaceElevated : const Color(0xFFEFEFEA)),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isCalendarSelected
+                        ? (isDark ? AppColors.darkPrimary : AppColors.primary)
+                        : (isDark ? AppColors.darkBorder : const Color(0xFFE5E4DE)),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 18,
+                      color: isCalendarSelected
+                          ? Colors.white
+                          : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                    ),
+                    if (isCalendarSelected) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        DateFormat('MM/dd').format(_selectedDate),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -1219,91 +1350,115 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Photo',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Photo (${_receiptPaths.length}/3)',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
         Row(
-          children: [
-            // Tile 1: Attached image or empty +
-            if (_receiptPath != null && _receiptPath!.isNotEmpty)
-              Stack(
-                children: [
-                  GestureDetector(
-                    onTap: () => PhotoPreviewDialog.show(context, imagePath: _receiptPath!),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: tileBg,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: FutureBuilder<File?>(
-                          future: AttachmentService.resolveFile(_receiptPath),
-                          builder: (context, snapshot) {
-                            final file = snapshot.data;
-                            if (file != null && file.existsSync()) {
-                              return Image.file(file, fit: BoxFit.cover);
-                            }
-                            return const Icon(Icons.image_rounded, size: 28, color: AppColors.primary);
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _receiptPath = null),
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: AppColors.expense,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            else
-              _buildAddPhotoTile(tileBg, isDark),
+          children: List.generate(3, (index) {
+            final hasPhoto = index < _receiptPaths.length;
+            final isNextAvailable = index == _receiptPaths.length;
 
-            const SizedBox(width: 12),
-            _buildAddPhotoTile(tileBg, isDark),
-            const SizedBox(width: 12),
-            _buildAddPhotoTile(tileBg, isDark),
-          ],
+            return Padding(
+              padding: EdgeInsets.only(right: index < 2 ? 12.0 : 0.0),
+              child: hasPhoto
+                  ? _buildPhotoThumbnail(index, _receiptPaths[index], tileBg, isDark)
+                  : _buildAddPhotoSlot(tileBg, isDark, enabled: isNextAvailable),
+            );
+          }),
         ),
       ],
     );
   }
 
-  Widget _buildAddPhotoTile(Color tileBg, bool isDark) {
+  Widget _buildPhotoThumbnail(int index, String path, Color tileBg, bool isDark) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onTap: () => PhotoPreviewDialog.show(context, imagePath: path),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: tileBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: FutureBuilder<File?>(
+                future: AttachmentService.resolveFile(path),
+                builder: (context, snapshot) {
+                  final file = snapshot.data;
+                  if (file != null && file.existsSync()) {
+                    return Image.file(file, fit: BoxFit.cover);
+                  }
+                  return const Icon(Icons.image_rounded, size: 28, color: AppColors.primary);
+                },
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -4,
+          right: -4,
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _receiptPaths.removeAt(index);
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: AppColors.expense,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAddPhotoSlot(Color tileBg, bool isDark, {required bool enabled}) {
     return InkWell(
-      onTap: () => _showImagePickerOptions(context),
+      onTap: enabled ? () => _showImagePickerOptions(context) : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         width: 64,
         height: 64,
         decoration: BoxDecoration(
-          color: tileBg,
+          color: enabled ? tileBg : tileBg.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (isDark ? AppColors.darkBorder : const Color(0xFFD0DFDF)).withValues(alpha: enabled ? 1.0 : 0.4),
+            style: BorderStyle.solid,
+          ),
         ),
         child: Center(
           child: Icon(
             Icons.add_rounded,
-            size: 32,
-            color: isDark ? AppColors.darkPrimary : AppColors.primary,
+            size: 30,
+            color: (isDark ? AppColors.darkPrimary : AppColors.primary).withValues(alpha: enabled ? 1.0 : 0.25),
           ),
         ),
       ),

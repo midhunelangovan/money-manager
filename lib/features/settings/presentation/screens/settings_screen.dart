@@ -152,7 +152,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           context: context,
                           icon: Icons.person_outline_rounded,
                           title: 'Personalization',
-                          subtitle: settings.profileName.isNotEmpty ? settings.profileName : 'Display Name',
+                          subtitle: '${settings.profileName.isNotEmpty ? settings.profileName : 'User'} • Profile & Dashboard preferences',
                           onTap: () {
                             Navigator.push(
                               context,
@@ -250,7 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // Muted Version Footer
                   Center(
                     child: Text(
-                      'Kal\'s Money Manager • Version ${AppConstants.appVersion}',
+                      '${AppConstants.appName} • Version ${AppConstants.appVersion}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,

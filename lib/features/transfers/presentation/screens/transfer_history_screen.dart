@@ -173,12 +173,12 @@ class _TransferHistoryScreenState extends State<TransferHistoryScreen> {
                                               width: 36,
                                               height: 36,
                                               decoration: BoxDecoration(
-                                                color: AppColors.transfer.withValues(alpha: 0.12),
+                                                color: AppColors.transferColor(isDark).withValues(alpha: 0.12),
                                                 borderRadius: BorderRadius.circular(10),
                                               ),
-                                              child: const Icon(
+                                              child: Icon(
                                                 Icons.swap_horiz_rounded,
-                                                color: AppColors.transfer,
+                                                color: AppColors.transferColor(isDark),
                                                 size: 20,
                                               ),
                                             ),
@@ -200,7 +200,7 @@ class _TransferHistoryScreenState extends State<TransferHistoryScreen> {
                                               style: TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w800,
-                                                color: AppColors.transfer,
+                                                color: AppColors.transferColor(isDark),
                                               ),
                                             ),
                                             const SizedBox(width: 4),

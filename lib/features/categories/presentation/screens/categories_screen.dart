@@ -46,7 +46,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         : LedgerTabType.expenses;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<CategoryProvider>().loadCategories();
+        final categoryProvider = context.read<CategoryProvider>();
+        if (categoryProvider.categories.isEmpty) {
+          categoryProvider.loadCategories();
+        }
       }
     });
   }
@@ -85,14 +88,17 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             showBackButton: false,
             leading: IconButton(
               icon: Icon(
-                canPop ? Icons.arrow_back_rounded : Icons.menu_rounded,
+                (widget.isPickerMode || canPop) ? Icons.arrow_back_rounded : Icons.menu_rounded,
                 color: Colors.white,
                 size: 26,
               ),
-              tooltip: canPop ? 'Back' : 'Navigation Menu',
+              tooltip: (widget.isPickerMode || canPop) ? 'Back' : 'Navigation Menu',
               onPressed: () {
-                if (canPop) {
-                  Navigator.pop(context);
+                if (widget.isPickerMode || canPop) {
+                  final route = ModalRoute.of(context);
+                  if (route != null && route.isCurrent) {
+                    Navigator.pop(context);
+                  }
                 } else {
                   _scaffoldKey.currentState?.openDrawer();
                 }

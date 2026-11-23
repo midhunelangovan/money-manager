@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../data/services/automatic_export_service.dart';
 import '../../data/services/backup_service.dart';
@@ -115,7 +116,7 @@ class BackupProvider extends ChangeNotifier {
       if (notify) {
         final notif = notificationService ?? NotificationService();
         await notif.showExportNotification(
-          title: "Kal's Money Manager",
+          title: AppConstants.appName,
           body: 'Your local backup has been created successfully (${file.path.split(Platform.pathSeparator).last}).',
           isSuccess: true,
           filePath: file.path,
@@ -167,7 +168,7 @@ class BackupProvider extends ChangeNotifier {
       if (notify) {
         final notif = notificationService ?? NotificationService();
         await notif.showExportNotification(
-          title: "Kal's Money Manager",
+          title: AppConstants.appName,
           body: 'Excel export completed: ${file.path.split(Platform.pathSeparator).last} is saved.',
           isSuccess: true,
           filePath: file.path,

@@ -117,7 +117,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.2),
+                        color: AppColors.isMinimalMode ? Colors.white.withValues(alpha: 0.2) : color.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: color.withValues(alpha: 0.6),

@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart' as pp;
 
 import '../../features/backup/presentation/screens/export_history_screen.dart';
+import 'app_logger.dart';
 
 class StorageHelper {
   static const MethodChannel _platformChannel =
@@ -30,13 +31,28 @@ class StorageHelper {
     if (Platform.isAndroid) {
       // 1. Standard Public Downloads directory
       final primaryDownload = Directory('/storage/emulated/0/Download');
-      if (await primaryDownload.exists()) {
+      if (await primaryDownload.exists() && await _isWritable(primaryDownload)) {
         return primaryDownload;
       }
       final altDownload = Directory('/storage/emulated/0/Downloads');
-      if (await altDownload.exists()) {
+      if (await altDownload.exists() && await _isWritable(altDownload)) {
         return altDownload;
       }
+      // 2. App-specific external storage Downloads directory (accessible without broad storage permissions)
+      try {
+        final extDirs = await pp.getExternalStorageDirectories(type: pp.StorageDirectory.downloads);
+        if (extDirs != null && extDirs.isNotEmpty && await extDirs.first.exists()) {
+          return extDirs.first;
+        }
+        final extDir = await pp.getExternalStorageDirectory();
+        if (extDir != null && await extDir.exists()) {
+          final extDownload = Directory(p.join(extDir.path, 'Downloads'));
+          if (!await extDownload.exists()) {
+            await extDownload.create(recursive: true);
+          }
+          return extDownload;
+        }
+      } catch (_) {}
       return primaryDownload;
     } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       try {
@@ -74,6 +90,7 @@ class StorageHelper {
     if (Platform.isAndroid) {
       try {
         final resolvedMime = mimeType ?? inferMimeType(fileName);
+        AppLogger.log('KALS_AUTO_EXPORT', 'Stage 4 (Export): Invoking native MediaStore channel for "$fileName"...');
         final result = await _platformChannel.invokeMapMethod<String, dynamic>(
           'saveFileToPublicDownloads',
           {
@@ -88,16 +105,18 @@ class StorageHelper {
           final file = File(filePath);
           final isValid = await verifyFileExistsAndNonEmpty(file);
           if (isValid) {
+            AppLogger.log('KALS_AUTO_EXPORT', 'Stage 4 (Export): Native MediaStore write verified at $filePath (${bytes.length} bytes)');
             return file;
           }
         }
-      } catch (_) {
-        // Fall back below if platform channel fails
+      } catch (e) {
+        AppLogger.log('KALS_AUTO_EXPORT', 'Stage 4 (Export): Native channel exception: $e. Falling back to direct filesystem write.');
       }
     }
 
     // Fallback for Desktop (Windows/macOS/Linux) or Android fallback
     final targetDir = await getDownloadsDirectory();
+    AppLogger.log('KALS_AUTO_EXPORT', 'Stage 4 (Export): Writing file directly to filesystem directory: ${targetDir.path}');
     return _writeUniqueFile(targetDir, fileName, bytes);
   }
 

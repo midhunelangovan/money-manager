@@ -56,13 +56,14 @@ class AppSnackBar {
     if (messenger == null) return;
 
     _generationToken++;
+    final thisToken = _generationToken;
     _activeTimer?.cancel();
     _activeTimer = null;
 
     // Immediately dismiss any previous snackbar to avoid stacking
     messenger.clearSnackBars();
 
-    messenger.showSnackBar(
+    final controller = messenger.showSnackBar(
       SnackBar(
         content: Text(
           message,
@@ -75,6 +76,21 @@ class AppSnackBar {
         action: action,
       ),
     );
+
+    if (action != null) {
+      _activeTimer = Timer(duration, () {
+        if (thisToken == _generationToken) {
+          messenger.hideCurrentSnackBar();
+        }
+        _activeTimer = null;
+      });
+      controller.closed.then((_) {
+        if (thisToken == _generationToken) {
+          _activeTimer?.cancel();
+          _activeTimer = null;
+        }
+      });
+    }
   }
 
   /// Shows an action with a guaranteed 5-second Undo action window.
@@ -163,11 +179,12 @@ class AppSnackBar {
     if (messenger == null) return;
 
     _generationToken++;
+    final thisToken = _generationToken;
     _activeTimer?.cancel();
     _activeTimer = null;
 
     messenger.clearSnackBars();
-    messenger.showSnackBar(
+    final controller = messenger.showSnackBar(
       SnackBar(
         content: Text(
           message,
@@ -180,6 +197,21 @@ class AppSnackBar {
         action: action,
       ),
     );
+
+    if (action != null) {
+      _activeTimer = Timer(duration, () {
+        if (thisToken == _generationToken) {
+          messenger.hideCurrentSnackBar();
+        }
+        _activeTimer = null;
+      });
+      controller.closed.then((_) {
+        if (thisToken == _generationToken) {
+          _activeTimer?.cancel();
+          _activeTimer = null;
+        }
+      });
+    }
   }
 
   /// Shows an informational or progress message (auto-dismiss after ~2.5 seconds).
@@ -193,11 +225,12 @@ class AppSnackBar {
     if (messenger == null) return;
 
     _generationToken++;
+    final thisToken = _generationToken;
     _activeTimer?.cancel();
     _activeTimer = null;
 
     messenger.clearSnackBars();
-    messenger.showSnackBar(
+    final controller = messenger.showSnackBar(
       SnackBar(
         content: Text(
           message,
@@ -209,5 +242,20 @@ class AppSnackBar {
         action: action,
       ),
     );
+
+    if (action != null) {
+      _activeTimer = Timer(duration, () {
+        if (thisToken == _generationToken) {
+          messenger.hideCurrentSnackBar();
+        }
+        _activeTimer = null;
+      });
+      controller.closed.then((_) {
+        if (thisToken == _generationToken) {
+          _activeTimer?.cancel();
+          _activeTimer = null;
+        }
+      });
+    }
   }
 }

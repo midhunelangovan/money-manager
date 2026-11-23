@@ -21,6 +21,11 @@ class Transaction {
   final String? categoryIcon;
   final int? categoryColor;
 
+  List<String> get receiptPaths {
+    if (receiptPath == null || receiptPath!.trim().isEmpty) return const [];
+    return receiptPath!.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+  }
+
   const Transaction({
     required this.id,
     required this.transactionType,
@@ -148,6 +153,11 @@ class LedgerItem {
 
   int get amountUnits => amount.units;
   LedgerItemType get type => itemType;
+
+  List<String> get receiptPaths {
+    if (receiptPath == null || receiptPath!.trim().isEmpty) return const [];
+    return receiptPath!.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+  }
 
   /// True if modified after creation
   bool get isModified =>

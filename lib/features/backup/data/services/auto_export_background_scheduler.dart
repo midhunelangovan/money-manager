@@ -5,6 +5,7 @@ import 'package:workmanager/workmanager.dart';
 
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/utilities/app_logger.dart';
 import '../../../accounts/data/repositories/account_repository_impl.dart';
 import '../../../categories/data/repositories/category_repository_impl.dart';
 import '../../../recurring/data/repositories/recurring_repository_impl.dart';
@@ -22,6 +23,12 @@ const String kAutoExportUniqueWorkName = 'kals_automatic_export_work';
 @pragma('vm:entry-point')
 void autoExportCallbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
+    final stopwatch = Stopwatch()..start();
+    AppLogger.log(
+      'KALS_AUTO_EXPORT',
+      'Stage 3 (Background Worker): Android WorkManager worker triggered for task: $taskName',
+    );
+
     try {
       WidgetsFlutterBinding.ensureInitialized();
       AppDatabase.initializeFfiIfRequired();
@@ -48,20 +55,31 @@ void autoExportCallbackDispatcher() {
         excelExportService: excelExportService,
       );
 
-      // Perform export if due
-      await autoExportService.checkAndRunIfDue();
+      // Perform export if due, explicitly marking as background worker to prevent clock jitter rejections
+      final exportTriggered = await autoExportService.checkAndRunIfDue(isBackgroundWorker: true);
+
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 3 (Background Worker): checkAndRunIfDue completed in ${stopwatch.elapsedMilliseconds}ms. '
+        'Export executed: $exportTriggered',
+      );
 
       // Reschedule next execution cycle
       final config = await autoExportService.loadConfig();
       if (config.isEnabled) {
+        final nextRun = autoExportService.calculateNextRun(config);
         await AutoExportBackgroundScheduler.scheduleOrUpdate(
           config,
-          nextRunTime: autoExportService.calculateNextRun(config),
+          nextRunTime: nextRun,
         );
       }
 
       return Future.value(true);
-    } catch (e) {
+    } catch (e, stack) {
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 3 (Background Worker): Task execution failed: $e\n$stack',
+      );
       if (kDebugMode) {
         debugPrint('AutoExport WorkManager background task error: $e');
       }
@@ -81,7 +99,9 @@ class AutoExportBackgroundScheduler {
       await Workmanager().initialize(
         autoExportCallbackDispatcher,
       );
+      AppLogger.log('KALS_AUTO_EXPORT', 'Stage 2 (Scheduling): WorkManager initialized successfully');
     } catch (e) {
+      AppLogger.log('KALS_AUTO_EXPORT', 'Stage 2 (Scheduling): WorkManager initialization failed: $e');
       if (kDebugMode) {
         debugPrint('AutoExportBackgroundScheduler.initialize error: $e');
       }
@@ -98,6 +118,10 @@ class AutoExportBackgroundScheduler {
 
     try {
       if (!config.isEnabled) {
+        AppLogger.log(
+          'KALS_AUTO_EXPORT',
+          'Stage 2 (Scheduling): Export disabled, cancelling WorkManager task: $kAutoExportUniqueWorkName',
+        );
         await cancel();
         return;
       }
@@ -123,6 +147,19 @@ class AutoExportBackgroundScheduler {
           break;
       }
 
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 2 (Scheduling): Registering periodic WorkManager task. '
+        'JobId=$kAutoExportUniqueWorkName, Delay=${delay.inMinutes}m (${delay.inSeconds}s), '
+        'Frequency=${frequencyDuration.inHours}h, Target=$target',
+      );
+
+      // Persist job ID and scheduled timestamp in DB
+      try {
+        await AppDatabase.instance.setSetting('auto_export_last_job_id', kAutoExportUniqueWorkName);
+        await AppDatabase.instance.setSetting('auto_export_next_scheduled', target.toIso8601String());
+      } catch (_) {}
+
       // ExistingPeriodicWorkPolicy.update replaces previous schedule seamlessly
       await Workmanager().registerPeriodicTask(
         kAutoExportUniqueWorkName,
@@ -137,7 +174,16 @@ class AutoExportBackgroundScheduler {
           requiresStorageNotLow: false,
         ),
       );
-    } catch (e) {
+
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 2 (Scheduling): WorkManager task successfully registered with policy=update',
+      );
+    } catch (e, stack) {
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 2 (Scheduling): Failed to register WorkManager task: $e\n$stack',
+      );
       if (kDebugMode) {
         debugPrint('AutoExportBackgroundScheduler.scheduleOrUpdate error: $e');
       }
@@ -149,7 +195,19 @@ class AutoExportBackgroundScheduler {
     if (!isSupportedPlatform) return;
     try {
       await Workmanager().cancelByUniqueName(kAutoExportUniqueWorkName);
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 2 (Scheduling): Successfully cancelled WorkManager task: $kAutoExportUniqueWorkName',
+      );
+      try {
+        await AppDatabase.instance.setSetting('auto_export_last_job_id', '');
+        await AppDatabase.instance.setSetting('auto_export_last_status', 'Disabled');
+      } catch (_) {}
     } catch (e) {
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 2 (Scheduling): Failed to cancel WorkManager task: $e',
+      );
       if (kDebugMode) {
         debugPrint('AutoExportBackgroundScheduler.cancel error: $e');
       }

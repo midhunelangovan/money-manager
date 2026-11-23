@@ -44,9 +44,7 @@ class RecurringProvider extends ChangeNotifier {
   Future<RecurringProcessingResult> processDueTransactions() async {
     try {
       final result = await processor.processDueTransactions();
-      if (result.generatedTransactionsCount > 0) {
-        await loadRecurring(rescheduleReminders: true);
-      }
+      await loadRecurring(rescheduleReminders: true);
       return result;
     } catch (e) {
       _errorMessage = 'Failed to process recurring transactions: $e';

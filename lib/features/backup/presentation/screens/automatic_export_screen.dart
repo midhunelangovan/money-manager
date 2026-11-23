@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/date_formatter.dart';
 import '../../../../core/utilities/storage_helper.dart';
 import '../../../../core/widgets/app_card.dart';
@@ -75,13 +76,7 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
       _isExportingNow = true;
     });
 
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    scaffoldMessenger.showSnackBar(
-      const SnackBar(
-        content: Text('Generating full transaction history export...'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    AppSnackBar.showInfo(context, 'Generating transaction history export...');
 
     final provider = context.read<BackupProvider>();
     try {
@@ -95,21 +90,14 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
           type: ExportFileType.excel,
         );
       } else {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(result?.errorMessage ?? provider.errorMessage ?? 'Export failed'),
-            backgroundColor: AppColors.expense,
-          ),
+        AppSnackBar.showError(
+          context,
+          result?.errorMessage ?? provider.errorMessage ?? 'Export failed',
         );
       }
     } catch (e) {
       if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Export error: $e'),
-            backgroundColor: AppColors.expense,
-          ),
-        );
+        AppSnackBar.showError(context, 'Export error: $e');
       }
     } finally {
       if (mounted) {
@@ -163,23 +151,25 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
         ? DateFormat('EEEE, d MMM yyyy, h:mm a').format(nextRun)
         : 'Paused (Automatic export is disabled)';
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-      body: Column(
-        children: [
-          // Header
-          AppHeader(
-            title: 'Automatic Export',
-            centerTitle: false,
-            showBackButton: false,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).maybePop(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+    return PopScope(
+      canPop: !_isExportingNow,
+      child: Scaffold(
+        backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+        body: Column(
+          children: [
+            // Header
+            AppHeader(
+              title: 'Automatic Export',
+              centerTitle: false,
+              showBackButton: false,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                tooltip: 'Back',
+                onPressed: _isExportingNow ? null : () => Navigator.of(context).maybePop(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              ),
             ),
-          ),
 
           // Scrollable settings body
           Expanded(
@@ -325,10 +315,48 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
                         const Divider(height: 28),
 
                         // Preferred Time Picker
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isNarrow = constraints.maxWidth < 280;
+                            final timeButton = InkWell(
+                              onTap: () => _selectTime(context, config),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.isMinimalMode
+                                      ? (isDark ? AppColors.minimalDarkBorderSubtle : AppColors.minimalLightBorder)
+                                      : primaryAccent.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppColors.isMinimalMode
+                                        ? (isDark ? AppColors.minimalDarkBorder : AppColors.minimalLightBorder)
+                                        : primaryAccent.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.access_time_rounded,
+                                      size: 16,
+                                      color: AppColors.isMinimalMode ? AppColors.textPrimary(isDark) : primaryAccent,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _formatTimeOfDay(config.preferredTime),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.isMinimalMode ? AppColors.textPrimary(isDark) : primaryAccent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+
+                            final label = Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
@@ -347,36 +375,29 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
                                   ),
                                 ),
                               ],
-                            ),
-                            InkWell(
-                              onTap: () => _selectTime(context, config),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: primaryAccent.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: primaryAccent.withValues(alpha: 0.3),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.access_time_rounded, size: 16, color: primaryAccent),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _formatTimeOfDay(config.preferredTime),
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: primaryAccent,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                            );
+
+                            if (isNarrow) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  label,
+                                  const SizedBox(height: 10),
+                                  Align(alignment: Alignment.centerLeft, child: timeButton),
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(child: label),
+                                const SizedBox(width: 12),
+                                timeButton,
+                              ],
+                            );
+                          },
                         ),
 
                         // Weekly schedule: Day of week
@@ -429,30 +450,35 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
                           const Divider(height: 28),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Day of the Month',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Day of the Month',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Safe clamp on shorter months',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Safe clamp on shorter months',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 12),
                               DropdownButton<int>(
                                 value: config.dayOfMonth,
                                 dropdownColor: isDark ? AppColors.darkSurfaceElevated : Colors.white,
+                                underline: const SizedBox(),
                                 items: List.generate(31, (index) => index + 1).map((day) {
                                   return DropdownMenuItem<int>(
                                     value: day,
@@ -520,14 +546,201 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      // Scope: All Transactions
-                      _buildSpecTile(
-                        icon: Icons.all_inclusive_rounded,
-                        title: 'Export Scope',
-                        value: 'All Transactions',
-                        subtitle: 'Complete transaction history. Older records are never omitted.',
-                        isDark: isDark,
-                        primaryAccent: primaryAccent,
+                      // Scope / Duration selector
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 280;
+                          final dropdown = DropdownButton<AutoExportScope>(
+                            isExpanded: isNarrow,
+                            isDense: true,
+                            value: [
+                              AutoExportScope.allTransactions,
+                              AutoExportScope.last7Days,
+                              AutoExportScope.last30Days,
+                              AutoExportScope.last90Days,
+                              AutoExportScope.lastYear,
+                            ].contains(config.scope)
+                                ? config.scope
+                                : AutoExportScope.allTransactions,
+                            dropdownColor: isDark ? AppColors.darkSurfaceElevated : Colors.white,
+                            underline: const SizedBox(),
+                            items: [
+                              AutoExportScope.allTransactions,
+                              AutoExportScope.last7Days,
+                              AutoExportScope.last30Days,
+                              AutoExportScope.last90Days,
+                              AutoExportScope.lastYear,
+                            ].map((scope) {
+                              return DropdownMenuItem<AutoExportScope>(
+                                value: scope,
+                                child: Text(
+                                  scope.displayName,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                backupProvider.updateAutoExportConfig(
+                                  config.copyWith(scope: val),
+                                );
+                              }
+                            },
+                          );
+
+                          final info = Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: primaryAccent.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.date_range_rounded, color: primaryAccent, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Export Duration',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Time span for automated export',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+
+                          if (isNarrow) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                info,
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: constraints.maxWidth,
+                                  child: dropdown,
+                                ),
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(child: info),
+                              const SizedBox(width: 8),
+                              dropdown,
+                            ],
+                          );
+                        },
+                      ),
+                      const Divider(height: 24),
+
+                      // Retention Count selector
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 280;
+                          final dropdown = DropdownButton<int>(
+                            isExpanded: isNarrow,
+                            isDense: true,
+                            value: [5, 10, 30].contains(config.retentionCount) ? config.retentionCount : 10,
+                            dropdownColor: isDark ? AppColors.darkSurfaceElevated : Colors.white,
+                            underline: const SizedBox(),
+                            items: const [5, 10, 30].map((count) {
+                              return DropdownMenuItem<int>(
+                                value: count,
+                                child: Text(
+                                  'Keep $count',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                backupProvider.updateAutoExportConfig(
+                                  config.copyWith(retentionCount: val),
+                                );
+                              }
+                            },
+                          );
+
+                          final info = Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: primaryAccent.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.cleaning_services_rounded, color: primaryAccent, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Retain Exports',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Conserve local device storage',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+
+                          if (isNarrow) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                info,
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: constraints.maxWidth,
+                                  child: dropdown,
+                                ),
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(child: info),
+                              const SizedBox(width: 8),
+                              dropdown,
+                            ],
+                          );
+                        },
                       ),
                       const Divider(height: 24),
 
@@ -620,127 +833,111 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Next Scheduled Export
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      // Status Badge Header Row
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 6,
                         children: [
-                          Icon(
-                            Icons.update_rounded,
-                            size: 20,
-                            color: config.isEnabled ? primaryAccent : Colors.grey,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Next Scheduled Export',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  nextRunString,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: config.isEnabled ? FontWeight.w600 : FontWeight.w400,
-                                    color: config.isEnabled
-                                        ? (isDark ? Colors.white : Colors.black87)
-                                        : Colors.grey,
-                                  ),
-                                ),
-                              ],
+                          const Text(
+                            'Current Status',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                          _buildStatusBadge(config, isDark),
                         ],
                       ),
                       const Divider(height: 24),
 
-                      // Last Successful Export
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            config.lastRunStatus == 'success'
-                                ? Icons.check_circle_outline_rounded
-                                : (config.lastRunStatus == 'failed'
-                                    ? Icons.error_outline_rounded
-                                    : Icons.history_rounded),
-                            size: 20,
-                            color: config.lastRunStatus == 'success'
-                                ? AppColors.income
-                                : (config.lastRunStatus == 'failed'
-                                    ? AppColors.expense
-                                    : Colors.grey),
+                      // Execution Overview (Frequency, Execution Time, Period)
+                      _buildDiagnosticItem(
+                        icon: Icons.tune_rounded,
+                        title: 'Configuration',
+                        value: config.isEnabled
+                            ? '${config.frequency.displayName} at ${_formatTimeOfDay(config.preferredTime)}'
+                            : 'Disabled',
+                        subtitle: 'Scope: ${config.scope.displayName}',
+                        isDark: isDark,
+                        primaryAccent: primaryAccent,
+                      ),
+                      const Divider(height: 20),
+
+                      // Next Expected Execution
+                      _buildDiagnosticItem(
+                        icon: Icons.update_rounded,
+                        title: 'Next Scheduled Export',
+                        value: nextRunString,
+                        subtitle: config.isEnabled
+                            ? 'Android background window (subject to device idle & battery schedule)'
+                            : 'Scheduling paused while disabled',
+                        isDark: isDark,
+                        primaryAccent: primaryAccent,
+                      ),
+                      const Divider(height: 20),
+
+                      // Last Export Status
+                      _buildDiagnosticItem(
+                        icon: Icons.check_circle_outline_rounded,
+                        title: 'Last Export Status',
+                        value: (config.lastSuccessTime ?? (config.isLastRunSuccess ? config.lastRunTime : null)) != null
+                            ? DateFormatter.formatDateAndTime(
+                                config.lastSuccessTime ?? config.lastRunTime!,
+                              )
+                            : 'No automatic export has run yet.',
+                        subtitle: (config.lastFilePath != null && config.lastFilePath!.isNotEmpty && config.isLastRunSuccess)
+                            ? '${p.basename(config.lastFilePath!)}${config.lastFileSize != null ? ' (${StorageHelper.formatFileSize(config.lastFileSize!)})' : ''}'
+                            : 'Awaiting first automated background run',
+                        isDark: isDark,
+                        primaryAccent: primaryAccent,
+                      ),
+
+                      // Last Failure Reason (if any)
+                      if (config.lastError != null && config.lastError!.isNotEmpty && !config.isLastRunSuccess) ...[
+                        const Divider(height: 20),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.expense.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.expense.withValues(alpha: 0.3),
+                            ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Last Export Status',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                if (config.lastRunTime != null) ...[
-                                  Text(
-                                    'Ran: ${DateFormatter.formatDateAndTime(config.lastRunTime!)}',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                  if (config.lastFilePath != null && config.lastFilePath!.isNotEmpty) ...[
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.error_outline_rounded, size: 18, color: AppColors.expense),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Last Failure Reason',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.expense,
+                                      ),
+                                    ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'File: ${p.basename(config.lastFilePath!)}'
-                                      '${config.lastFileSize != null ? ' (${StorageHelper.formatFileSize(config.lastFileSize!)})' : ''}',
+                                      config.lastError!,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                        color: isDark ? Colors.white70 : Colors.black87,
                                       ),
                                     ),
                                   ],
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: config.lastRunStatus == 'success'
-                                          ? AppColors.income.withValues(alpha: 0.15)
-                                          : AppColors.expense.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      config.lastRunStatus == 'success'
-                                          ? 'COMPLETED SUCCESSFULLY'
-                                          : 'FAILED: ${config.lastError ?? 'Unknown error'}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                        color: config.lastRunStatus == 'success'
-                                            ? AppColors.income
-                                            : AppColors.expense,
-                                      ),
-                                    ),
-                                  ),
-                                ] else ...[
-                                  Text(
-                                    'No automatic export has run yet.',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -783,6 +980,104 @@ class _AutomaticExportScreenState extends State<AutomaticExportScreen> {
           ),
         ],
       ),
+    ),
+  );
+  }
+
+  Widget _buildStatusBadge(AutoExportConfig config, bool isDark) {
+    Color badgeColor;
+    Color textColor;
+    final status = config.statusDisplay;
+
+    switch (status) {
+      case 'Completed':
+        badgeColor = AppColors.income.withValues(alpha: 0.15);
+        textColor = AppColors.income;
+        break;
+      case 'Running':
+        badgeColor = Colors.blue.withValues(alpha: 0.15);
+        textColor = Colors.blue;
+        break;
+      case 'Failed':
+        badgeColor = AppColors.expense.withValues(alpha: 0.15);
+        textColor = AppColors.expense;
+        break;
+      case 'Awaiting Android background execution':
+        badgeColor = Colors.amber.withValues(alpha: 0.15);
+        textColor = isDark ? Colors.amber[300]! : Colors.amber[800]!;
+        break;
+      case 'Disabled':
+      default:
+        badgeColor = Colors.grey.withValues(alpha: 0.15);
+        textColor = Colors.grey;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: badgeColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: textColor.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: textColor,
+          letterSpacing: 0.2,
+        ),
+        softWrap: true,
+      ),
+    );
+  }
+
+  Widget _buildDiagnosticItem({
+    required IconData icon,
+    required String title,
+    required String value,
+    required String subtitle,
+    required bool isDark,
+    required Color primaryAccent,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: primaryAccent),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

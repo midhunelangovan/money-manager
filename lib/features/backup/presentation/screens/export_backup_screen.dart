@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/export_success_dialog.dart';
@@ -40,18 +41,12 @@ class _ExportBackupScreenState extends State<ExportBackupScreen> {
     if (_isBusy) return;
 
     final backupProvider = context.read<BackupProvider>();
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     setState(() {
       _executingActionId = actionId;
     });
 
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text('Generating $title...'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    AppSnackBar.showInfo(context, 'Generating $title...');
 
     File? file;
     try {
@@ -84,11 +79,9 @@ class _ExportBackupScreenState extends State<ExportBackupScreen> {
         type: isFullBackup ? ExportFileType.backup : ExportFileType.excel,
       );
     } else {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(backupProvider.errorMessage ?? 'Operation failed. Please try again.'),
-          backgroundColor: AppColors.expense,
-        ),
+      AppSnackBar.showError(
+        context,
+        backupProvider.errorMessage ?? 'Operation failed. Please try again.',
       );
     }
   }
@@ -104,23 +97,31 @@ class _ExportBackupScreenState extends State<ExportBackupScreen> {
         ? 'Excel (.xlsx) • Scope: ${widget.periodDescription}'
         : 'Excel (.xlsx) • Current period & account scope';
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-      body: Column(
-        children: [
-          // Curved full-width branded header with white back arrow
-          AppHeader(
-            title: 'Export & Backup',
-            centerTitle: false,
-            showBackButton: false,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).maybePop(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+    return PopScope(
+      canPop: !_isBusy,
+      child: Scaffold(
+        backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+        body: Column(
+          children: [
+            // Curved full-width branded header with white back arrow
+            AppHeader(
+              title: 'Export & Backup',
+              centerTitle: false,
+              showBackButton: false,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                tooltip: 'Back',
+                onPressed: _isBusy
+                    ? null
+                    : () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              ),
             ),
-          ),
 
           // Scrollable page content
           Expanded(
@@ -241,6 +242,7 @@ class _ExportBackupScreenState extends State<ExportBackupScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 

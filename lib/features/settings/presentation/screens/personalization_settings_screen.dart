@@ -56,7 +56,7 @@ class _PersonalizationSettingsScreenState extends State<PersonalizationSettingsS
         child: Column(
           children: [
             const AppHeader(
-              title: 'Profile & Identity',
+              title: 'Personalization',
               showBackButton: true,
             ),
             Expanded(
@@ -120,6 +120,86 @@ class _PersonalizationSettingsScreenState extends State<PersonalizationSettingsS
                             label: 'Display Name',
                             hintText: 'Enter your name',
                             textCapitalization: TextCapitalization.words,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Dashboard Settings
+                    AppCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Home Dashboard',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Customize the widgets and sections displayed on your primary overview screen.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: settings.showRecentTransactions
+                                      ? (isDark ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2) : AppColors.primaryContainer)
+                                      : (isDark ? AppColors.darkSurfaceElevated : AppColors.lightBorder.withValues(alpha: 0.4)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.receipt_long_rounded,
+                                  color: settings.showRecentTransactions
+                                      ? (isDark ? Theme.of(context).colorScheme.primary : AppColors.primary)
+                                      : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Show Recent Transactions',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Display recent transactions below the chart on the Home screen.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: settings.showRecentTransactions,
+                                activeTrackColor: isDark ? Theme.of(context).colorScheme.primary : AppColors.primary,
+                                onChanged: (val) => settings.setShowRecentTransactions(val),
+                              ),
+                            ],
                           ),
                         ],
                       ),

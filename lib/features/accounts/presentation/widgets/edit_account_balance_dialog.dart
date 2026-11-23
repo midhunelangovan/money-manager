@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utilities/indian_number_formatter.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../domain/entities/account.dart';
@@ -39,7 +39,7 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
     super.initState();
     final currentUnits = widget.accountWithBalance.calculatedBalance.units;
     _balanceController = TextEditingController(
-      text: (currentUnits / 100).toStringAsFixed(2),
+      text: IndianNumberFormatter.formatUnits(currentUnits, includeDecimals: true, trimZeroDecimals: false),
     );
   }
 
@@ -165,7 +165,8 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
 
     final acc = widget.accountWithBalance.account;
     final currentBalance = widget.accountWithBalance.calculatedBalance;
-    final parsedNewBalance = Money.tryParse(_balanceController.text) ?? currentBalance;
+    final parsedUnits = IndianNumberFormatter.parseToUnits(_balanceController.text);
+    final parsedNewBalance = Money.fromUnits(parsedUnits);
     final diffUnits = parsedNewBalance.units - currentBalance.units;
     final isDiffPositive = diffUnits > 0;
     final isDiffZero = diffUnits == 0;
@@ -316,7 +317,7 @@ class _EditAccountBalanceDialogState extends State<EditAccountBalanceDialog> {
                     autofocus: true,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                      IndianNumberTextInputFormatter(maxDecimalDigits: 2),
                     ],
                     style: AppTypography.displaySmall.copyWith(
                       fontWeight: FontWeight.w800,

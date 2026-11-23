@@ -1,12 +1,9 @@
-import 'dart:io';
 import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_category_icons.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/navigation/navigation_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/date_formatter.dart';
@@ -189,7 +186,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
           _selectedDate = DateTime(_selectedDate.year - 1, _selectedDate.month, _selectedDate.day.clamp(1, 28));
           break;
         case TimePeriod.period:
-          _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1, _selectedDate.day.clamp(1, 28));
+          if (_customRange != null) {
+            final days = _customRange!.duration.inDays + 1;
+            _customRange = DateTimeRange(
+              start: _customRange!.start.subtract(Duration(days: days)),
+              end: _customRange!.end.subtract(Duration(days: days)),
+            );
+            _selectedDate = _customRange!.start;
+          } else {
+            _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1, _selectedDate.day.clamp(1, 28));
+          }
           break;
       }
     });
@@ -212,7 +218,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
           _selectedDate = DateTime(_selectedDate.year + 1, _selectedDate.month, _selectedDate.day.clamp(1, 28));
           break;
         case TimePeriod.period:
-          _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1, _selectedDate.day.clamp(1, 28));
+          if (_customRange != null) {
+            final days = _customRange!.duration.inDays + 1;
+            _customRange = DateTimeRange(
+              start: _customRange!.start.add(Duration(days: days)),
+              end: _customRange!.end.add(Duration(days: days)),
+            );
+            _selectedDate = _customRange!.start;
+          } else {
+            _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1, _selectedDate.day.clamp(1, 28));
+          }
           break;
       }
     });
@@ -352,8 +367,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
 
       final netMovementUnits = totalIncomeUnits - totalExpenseUnits;
+      final int filteredTotalUnits;
+      if (_typeFilter == ReportTypeFilter.expenses) {
+        filteredTotalUnits = totalExpenseUnits;
+      } else if (_typeFilter == ReportTypeFilter.income) {
+        filteredTotalUnits = totalIncomeUnits;
+      } else {
+        filteredTotalUnits = totalExpenseUnits + totalIncomeUnits;
+      }
 
-      summarySheet.appendRow([TextCellValue("Kal's Money Manager - Period Financial Report")]);
+      summarySheet.appendRow([TextCellValue('${AppConstants.appName} - Period Financial Report')]);
       summarySheet.appendRow([TextCellValue('Period: $_periodLabel')]);
       summarySheet.appendRow([TextCellValue('Account: $accountName')]);
       summarySheet.appendRow([TextCellValue('Filter Type: ${_typeFilter.displayName}')]);
@@ -361,6 +384,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       summarySheet.appendRow([TextCellValue('')]);
 
       summarySheet.appendRow([TextCellValue('Metric'), TextCellValue('Amount (INR)')]);
+      summarySheet.appendRow([TextCellValue('Total Filtered Amount'), DoubleCellValue(filteredTotalUnits / 100.0)]);
       summarySheet.appendRow([TextCellValue('Total Income'), DoubleCellValue(totalIncomeUnits / 100.0)]);
       summarySheet.appendRow([TextCellValue('Total Expenses'), DoubleCellValue(totalExpenseUnits / 100.0)]);
       summarySheet.appendRow([TextCellValue('Net Movement / Savings'), DoubleCellValue(netMovementUnits / 100.0)]);
@@ -414,13 +438,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       final fileName = 'Kals_Report_$periodSlug${AppConstants.excelFileExtension}';
 
-      final exportDir = await StorageHelper.getDownloadsDirectory();
-      if (!await exportDir.exists()) {
-        await exportDir.create(recursive: true);
-      }
-
-      final file = File(p.join(exportDir.path, fileName));
-      await file.writeAsBytes(fileBytes, flush: true);
+      final file = await StorageHelper.saveToPublicDownloads(
+        bytes: fileBytes,
+        fileName: fileName,
+      );
 
       if (mounted) {
         await ExportSuccessDialog.show(
@@ -464,7 +485,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   void _showAccountPicker(BuildContext context, List<AccountWithBalance> accounts) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryAccent = isDark ? Theme.of(context).colorScheme.primary : AppColors.primary;
+    final primaryAccent = AppColors.primaryAction(isDark);
 
     showModalBottomSheet(
       context: context,
@@ -495,7 +516,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 Divider(color: isDark ? AppColors.darkBorderSubtle : null),
                 ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.primaryContainer,
+                    backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.primaryContainerColor(isDark),
                     child: Icon(Icons.account_balance_wallet_rounded, color: primaryAccent),
                   ),
                   title: Text(
@@ -520,8 +541,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: color.withValues(alpha: 0.15),
-                      child: Icon(acc.account.iconData, color: color),
+                      backgroundColor: AppColors.accountIconBackground(color, isDark),
+                      child: Icon(
+                        acc.account.iconData,
+                        color: AppColors.accountIconColor(color, isDark),
+                      ),
                     ),
                     title: Text(
                       acc.account.name,
@@ -672,7 +696,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 if (canPop) {
                   Navigator.pop(context);
                 } else {
-                  MainNavigationService.openDrawer();
+                  _scaffoldKey.currentState?.openDrawer();
                 }
               },
             ),
@@ -766,7 +790,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                       Icon(
                                         Icons.account_balance_rounded,
                                         size: 15,
-                                        color: isDark ? primaryColor : AppColors.primary,
+                                        color: AppColors.primaryAction(isDark),
                                       ),
                                       const SizedBox(width: 6),
                                       Flexible(
@@ -800,7 +824,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               selectedPeriod: _selectedPeriod,
                               onPeriodChanged: (period) {
                                 setState(() => _selectedPeriod = period);
-                                _loadReportData();
+                                if (period == TimePeriod.period && _customRange == null) {
+                                  _pickDate();
+                                } else {
+                                  _loadReportData();
+                                }
                               },
                               dateRangeLabel: _periodLabel,
                               onPrevious: _onPrevious,
@@ -872,7 +900,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                         _buildTypographicStat(
                                           'Income',
                                           incomeMoney.format(currency: settings.currency),
-                                          AppColors.income,
+                                          AppColors.incomeColor(isDark),
                                         ),
                                         Container(
                                           width: 1,
@@ -882,7 +910,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                         _buildTypographicStat(
                                           'Expenses',
                                           expenseMoney.format(currency: settings.currency),
-                                          AppColors.expense,
+                                          AppColors.expenseColor(isDark),
                                         ),
                                         Container(
                                           width: 1,
@@ -892,7 +920,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                         _buildTypographicStat(
                                           'Savings',
                                           netSavingsMoney.format(currency: settings.currency),
-                                          isDark ? primaryColor : AppColors.primary,
+                                          AppColors.primaryAction(isDark),
                                         ),
                                       ],
                                     ),
@@ -952,7 +980,69 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                             const SizedBox(height: 24),
 
-                            // 3. Category Breakdown List (Clean 2-level layout)
+                            // 3. Prominent Summary: Total Filtered Amount
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: AppColors.border(isDark),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'TOTAL FILTERED AMOUNT',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.6,
+                                          color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        displayTotalMoney.format(currency: settings.currency),
+                                        style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -0.5,
+                                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSelectedBackground,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isDark ? AppColors.darkBorderSubtle : AppColors.lightBorder,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _typeFilter.displayName,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // 4. Category Breakdown List (Clean 2-level layout)
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -1071,8 +1161,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                                       child: LinearProgressIndicator(
                                                         value: percentage.clamp(0.0, 1.0),
                                                         minHeight: 5,
-                                                        backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSelectedBackground,
-                                                        valueColor: AlwaysStoppedAnimation<Color>(catColor),
+                                                        backgroundColor: AppColors.progressTrack(isDark),
+                                                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.progressIndicator(catColor, isDark)),
                                                       ),
                                                     ),
                                                   ),
@@ -1113,7 +1203,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildFilterChip(ReportTypeFilter filter) {
     final isSelected = _typeFilter == filter;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final primaryColor = AppColors.primaryAction(isDark);
 
     return Expanded(
       child: GestureDetector(
@@ -1126,7 +1216,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
             color: isSelected
-                ? (isDark ? primaryColor.withValues(alpha: 0.25) : AppColors.primary.withValues(alpha: 0.12))
+                ? (isDark
+                    ? (AppColors.isMinimalMode ? AppColors.minimalDarkPrimaryContainer : primaryColor.withValues(alpha: 0.25))
+                    : (AppColors.isMinimalMode ? AppColors.minimalLightSelectedBackground : AppColors.primary.withValues(alpha: 0.12)))
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
@@ -1137,7 +1229,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               fontSize: 12.5,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               color: isSelected
-                  ? (isDark ? primaryColor : AppColors.primary)
+                  ? (isDark
+                      ? (AppColors.isMinimalMode ? AppColors.minimalDarkTextPrimary : primaryColor)
+                      : (AppColors.isMinimalMode ? AppColors.minimalLightSelectedText : AppColors.primary))
                   : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
             ),
           ),

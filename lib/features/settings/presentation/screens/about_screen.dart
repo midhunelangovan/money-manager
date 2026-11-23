@@ -34,11 +34,15 @@ class AboutScreen extends StatelessWidget {
                             width: 72,
                             height: 72,
                             decoration: BoxDecoration(
-                              color: isDark ? AppColors.darkSurfaceElevated : Colors.white,
+                              color: isDark ? const Color(0xFF132227) : Colors.white,
                               borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF203E44) : const Color(0xFFE2E8F0),
+                                width: 1.5,
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
+                                  color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),

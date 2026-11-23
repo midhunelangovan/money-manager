@@ -1,8 +1,11 @@
 package com.kals.kals_money_manager
 
 import android.app.DownloadManager
+import android.content.ComponentName
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -17,7 +20,9 @@ import java.io.File
 class MainActivity : FlutterActivity() {
 
     private val CHANNEL = "com.kals.kals_money_manager/widget_channel"
+    private val LEGACY_CHANNEL = "com.kals.kals_money_manager.dev/widget_channel"
     private var methodChannel: MethodChannel? = null
+    private var legacyMethodChannel: MethodChannel? = null
     private var initialAction: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,10 +38,14 @@ class MainActivity : FlutterActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val action = intent?.action
-        if (action == KalsAppWidgetProvider.ACTION_ADD_EXPENSE || action == KalsAppWidgetProvider.ACTION_ADD_INCOME) {
-            val actionType = if (action == KalsAppWidgetProvider.ACTION_ADD_EXPENSE) "expense" else "income"
+        if (action == KalsAppWidgetProvider.ACTION_ADD_EXPENSE ||
+            action == KalsAppWidgetProvider.ACTION_ADD_INCOME ||
+            action == "com.kals.kals_money_manager.dev.ADD_EXPENSE" ||
+            action == "com.kals.kals_money_manager.dev.ADD_INCOME") {
+            val actionType = if (action == KalsAppWidgetProvider.ACTION_ADD_EXPENSE || action == "com.kals.kals_money_manager.dev.ADD_EXPENSE") "expense" else "income"
             if (methodChannel != null) {
                 methodChannel?.invokeMethod("onWidgetAction", actionType)
+                legacyMethodChannel?.invokeMethod("onWidgetAction", actionType)
             } else {
                 initialAction = actionType
             }
@@ -45,8 +54,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-        methodChannel?.setMethodCallHandler { call, result ->
+        val handler = MethodChannel.MethodCallHandler { call, result ->
             when (call.method) {
                 "getInitialAction" -> {
                     val action = initialAction
@@ -85,11 +93,18 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        methodChannel?.setMethodCallHandler(handler)
+
+        legacyMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LEGACY_CHANNEL)
+        legacyMethodChannel?.setMethodCallHandler(handler)
+
         // Deliver initial action if queued before engine initialization
         if (initialAction != null) {
             val action = initialAction
             initialAction = null
             methodChannel?.invokeMethod("onWidgetAction", action)
+            legacyMethodChannel?.invokeMethod("onWidgetAction", action)
         }
     }
 

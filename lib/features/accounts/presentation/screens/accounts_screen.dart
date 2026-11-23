@@ -31,7 +31,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final settings = context.watch<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = isDark ? AppColors.darkPrimary : AppColors.primary;
-    final canPop = Navigator.canPop(context);
 
     final accounts = accountProvider.accountsWithBalances.where((a) {
       if (_showArchived) return true;
@@ -52,19 +51,13 @@ class _AccountsScreenState extends State<AccountsScreen> {
             centerTitle: true,
             title: 'Accounts',
             leading: IconButton(
-              icon: Icon(
-                canPop ? Icons.arrow_back_rounded : Icons.menu_rounded,
+              icon: const Icon(
+                Icons.menu_rounded,
                 color: Colors.white,
                 size: 26,
               ),
-              tooltip: canPop ? 'Back' : 'Navigation Menu',
-              onPressed: () {
-                if (canPop) {
-                  Navigator.pop(context);
-                } else {
-                  MainNavigationService.openDrawer();
-                }
-              },
+              tooltip: 'Navigation Menu',
+              onPressed: MainNavigationService.openDrawer,
             ),
             actions: [
               IconButton(
@@ -260,9 +253,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                           ...accounts.map((accItem) {
                             final acc = accItem.account;
                             final balanceFormatted = accItem.calculatedBalance.format(currency: settings.currency);
-                            final color = acc.color != null
-                                ? Color(acc.color!)
-                                : primaryColor;
+                            final originalColor = acc.color != null ? Color(acc.color!) : null;
 
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 10),
@@ -281,10 +272,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                                       width: 44,
                                       height: 44,
                                       decoration: BoxDecoration(
-                                        color: color.withValues(alpha: 0.12),
+                                        color: AppColors.accountIconBackground(originalColor, isDark),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Icon(acc.iconData, color: color, size: 22),
+                                      child: Icon(acc.iconData, color: AppColors.accountIconColor(originalColor, isDark), size: 22),
                                     ),
                                     const SizedBox(width: 14),
                                     Expanded(
@@ -320,8 +311,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'accounts_fab',
-        backgroundColor: AppColors.floatingAction,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.floatingActionButton(isDark),
+        foregroundColor: AppColors.floatingActionButtonIcon(isDark),
         elevation: 3,
         shape: const CircleBorder(),
         onPressed: () async {

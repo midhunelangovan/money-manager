@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_typography.dart';
+import '../utilities/indian_number_formatter.dart';
 
 class AmountInputField extends StatelessWidget {
   final TextEditingController controller;
@@ -50,9 +49,10 @@ class AmountInputField extends StatelessWidget {
             children: [
               Text(
                 currencySymbol,
-                style: AppTypography.amountLarge.copyWith(
-                  color: activeColor,
+                style: TextStyle(
+                  fontSize: 22,
                   fontWeight: FontWeight.w800,
+                  color: activeColor,
                 ),
               ),
               const SizedBox(width: 8),
@@ -61,11 +61,12 @@ class AmountInputField extends StatelessWidget {
                   controller: controller,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                    IndianNumberTextInputFormatter(maxDecimalDigits: 2),
                   ],
-                  style: AppTypography.amountLarge.copyWith(
-                    color: activeColor,
+                  style: TextStyle(
+                    fontSize: 26,
                     fontWeight: FontWeight.w800,
+                    color: activeColor,
                   ),
                   decoration: const InputDecoration(
                     hintText: '0.00',

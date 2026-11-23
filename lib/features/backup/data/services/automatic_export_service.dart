@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/utilities/app_logger.dart';
 import '../../../../core/utilities/date_formatter.dart';
 import '../../../../core/utilities/storage_helper.dart';
 import 'auto_export_background_scheduler.dart';
@@ -32,8 +33,12 @@ enum AutoExportFormat {
 }
 
 enum AutoExportScope {
-  allTransactions('All Transactions'),
-  currentMonth('Current Month / Recent');
+  allTransactions('All history'),
+  last7Days('Last 7 days'),
+  last30Days('Last 30 days'),
+  last90Days('Last 90 days'),
+  lastYear('Last year'),
+  currentMonth('Current Month');
 
   final String displayName;
   const AutoExportScope(this.displayName);
@@ -49,12 +54,16 @@ class AutoExportConfig {
   final AutoExportScope scope;
   final int retentionCount; // 5, 10, 30
   final bool notifyOnComplete;
+  final DateTime? enabledAt;
 
   final DateTime? lastRunTime;
-  final String? lastRunStatus; // 'success', 'failed'
+  final DateTime? lastSuccessTime;
+  final String? lastRunStatus; // 'Completed', 'Failed', 'Running', 'Awaiting Android background execution'
   final String? lastFilePath;
   final int? lastFileSize;
   final String? lastError;
+  final String? lastJobId;
+  final DateTime? nextScheduledRun;
 
   final DateTime? lastBackupTime;
   final String? lastBackupPath;
@@ -74,11 +83,15 @@ class AutoExportConfig {
     this.scope = AutoExportScope.allTransactions,
     this.retentionCount = 10,
     this.notifyOnComplete = true,
+    this.enabledAt,
     this.lastRunTime,
+    this.lastSuccessTime,
     this.lastRunStatus,
     this.lastFilePath,
     this.lastFileSize,
     this.lastError,
+    this.lastJobId,
+    this.nextScheduledRun,
     this.lastBackupTime,
     this.lastBackupPath,
     this.lastBackupSize,
@@ -86,6 +99,18 @@ class AutoExportConfig {
     this.lastExcelPath,
     this.lastExcelSize,
   });
+
+  /// True if the last run was verified and completed successfully
+  bool get isLastRunSuccess => lastRunStatus == 'Completed' || lastRunStatus == 'success';
+
+  /// Accurate, consistent status terminology for UI and diagnostics
+  String get statusDisplay {
+    if (!isEnabled) return 'Disabled';
+    if (lastRunStatus == 'Running') return 'Running';
+    if (lastRunStatus == 'Completed' || lastRunStatus == 'success') return 'Completed';
+    if (lastRunStatus == 'Failed' || lastRunStatus == 'failed') return 'Failed';
+    return 'Awaiting Android background execution';
+  }
 
   AutoExportConfig copyWith({
     bool? isEnabled,
@@ -97,11 +122,15 @@ class AutoExportConfig {
     AutoExportScope? scope,
     int? retentionCount,
     bool? notifyOnComplete,
+    DateTime? enabledAt,
     DateTime? lastRunTime,
+    DateTime? lastSuccessTime,
     String? lastRunStatus,
     String? lastFilePath,
     int? lastFileSize,
     String? lastError,
+    String? lastJobId,
+    DateTime? nextScheduledRun,
     DateTime? lastBackupTime,
     String? lastBackupPath,
     int? lastBackupSize,
@@ -119,11 +148,15 @@ class AutoExportConfig {
       scope: scope ?? this.scope,
       retentionCount: retentionCount ?? this.retentionCount,
       notifyOnComplete: notifyOnComplete ?? this.notifyOnComplete,
+      enabledAt: enabledAt ?? this.enabledAt,
       lastRunTime: lastRunTime ?? this.lastRunTime,
+      lastSuccessTime: lastSuccessTime ?? this.lastSuccessTime,
       lastRunStatus: lastRunStatus ?? this.lastRunStatus,
       lastFilePath: lastFilePath ?? this.lastFilePath,
       lastFileSize: lastFileSize ?? this.lastFileSize,
       lastError: lastError ?? this.lastError,
+      lastJobId: lastJobId ?? this.lastJobId,
+      nextScheduledRun: nextScheduledRun ?? this.nextScheduledRun,
       lastBackupTime: lastBackupTime ?? this.lastBackupTime,
       lastBackupPath: lastBackupPath ?? this.lastBackupPath,
       lastBackupSize: lastBackupSize ?? this.lastBackupSize,
@@ -202,12 +235,20 @@ class AutomaticExportService {
     final retention = int.tryParse(await db.getSetting('auto_export_retention') ?? '') ?? 10;
     final notify = (await db.getSetting('auto_export_notifications')) != 'false';
 
+    final enabledAtStr = await db.getSetting('auto_export_enabled_at');
+    final enabledAt = enabledAtStr != null ? DateTime.tryParse(enabledAtStr) : null;
+
     final lastRunStr = await db.getSetting('auto_export_last_run');
     final lastRunTime = lastRunStr != null ? DateTime.tryParse(lastRunStr) : null;
+    final lastSuccessStr = await db.getSetting('auto_export_last_success');
+    final lastSuccessTime = lastSuccessStr != null ? DateTime.tryParse(lastSuccessStr) : null;
     final lastStatus = await db.getSetting('auto_export_last_status');
     final lastPath = await db.getSetting('auto_export_last_file_path');
     final lastSize = int.tryParse(await db.getSetting('auto_export_last_file_size') ?? '');
     final lastErr = await db.getSetting('auto_export_last_error');
+    final lastJobId = await db.getSetting('auto_export_last_job_id');
+    final nextScheduledStr = await db.getSetting('auto_export_next_scheduled');
+    final nextScheduledRun = nextScheduledStr != null ? DateTime.tryParse(nextScheduledStr) : null;
 
     final lastBackupStr = await db.getSetting('health_last_backup_time');
     final lastBackupTime = lastBackupStr != null ? DateTime.tryParse(lastBackupStr) : null;
@@ -229,11 +270,15 @@ class AutomaticExportService {
       scope: scope,
       retentionCount: retention,
       notifyOnComplete: notify,
+      enabledAt: enabledAt,
       lastRunTime: lastRunTime,
+      lastSuccessTime: lastSuccessTime,
       lastRunStatus: lastStatus,
       lastFilePath: lastPath,
       lastFileSize: lastSize,
       lastError: lastErr,
+      lastJobId: lastJobId,
+      nextScheduledRun: nextScheduledRun,
       lastBackupTime: lastBackupTime,
       lastBackupPath: lastBackupPath,
       lastBackupSize: lastBackupSize,
@@ -244,6 +289,14 @@ class AutomaticExportService {
   }
 
   Future<void> saveConfig(AutoExportConfig config) async {
+    final stopwatch = Stopwatch()..start();
+    AppLogger.log(
+      'KALS_AUTO_EXPORT',
+      'Stage 1 (Configuration): Saving configuration. Enabled=${config.isEnabled}, '
+      'Frequency=${config.frequency.displayName}, Time=${config.preferredTime.hour.toString().padLeft(2, '0')}:${config.preferredTime.minute.toString().padLeft(2, '0')}, '
+      'Scope=${config.scope.displayName}, Retention=${config.retentionCount}',
+    );
+
     final db = appDatabase;
     await db.setSetting('auto_export_enabled', config.isEnabled.toString());
     await db.setSetting('auto_export_frequency', config.frequency.name);
@@ -256,10 +309,40 @@ class AutomaticExportService {
     await db.setSetting('auto_export_retention', config.retentionCount.toString());
     await db.setSetting('auto_export_notifications', config.notifyOnComplete.toString());
 
+    if (config.lastRunTime != null) {
+      await db.setSetting('auto_export_last_run', config.lastRunTime!.toIso8601String());
+    }
+
+    if (config.enabledAt != null) {
+      await db.setSetting('auto_export_enabled_at', config.enabledAt!.toIso8601String());
+    } else if (config.isEnabled) {
+      final existingEnabledAt = await db.getSetting('auto_export_enabled_at');
+      if (existingEnabledAt == null || existingEnabledAt.isEmpty) {
+        await db.setSetting('auto_export_enabled_at', DateTime.now().toIso8601String());
+      }
+    } else {
+      await db.setSetting('auto_export_enabled_at', '');
+      await db.setSetting('auto_export_last_status', 'Disabled');
+    }
+
+    final nextRun = calculateNextRun(config);
+    if (config.isEnabled) {
+      await db.setSetting('auto_export_next_scheduled', nextRun.toIso8601String());
+      final currentStatus = await db.getSetting('auto_export_last_status');
+      if (currentStatus == null || currentStatus.isEmpty || currentStatus == 'Disabled') {
+        await db.setSetting('auto_export_last_status', 'Awaiting Android background execution');
+      }
+    }
+
     // Sync Android WorkManager scheduling
     await AutoExportBackgroundScheduler.scheduleOrUpdate(
       config,
-      nextRunTime: calculateNextRun(config),
+      nextRunTime: nextRun,
+    );
+
+    AppLogger.log(
+      'KALS_AUTO_EXPORT',
+      'Stage 1 (Configuration): Completed in ${stopwatch.elapsedMilliseconds}ms. Next expected run: $nextRun',
     );
   }
 
@@ -329,55 +412,138 @@ class AutomaticExportService {
     }
   }
 
-  /// Checks if scheduled export is due and executes it idempotently without duplicates.
-  Future<AutoExportResult?> checkAndRunIfDue() async {
-    final config = await loadConfig();
-    if (!config.isEnabled) return null;
+  /// Calculates the most recent scheduled execution time that was due on or before [from].
+  DateTime calculateMostRecentDueTime(AutoExportConfig config, {DateTime? from}) {
+    final now = from ?? DateTime.now();
+    final targetHour = config.preferredTime.hour;
+    final targetMinute = config.preferredTime.minute;
 
-    final now = DateTime.now();
-    // Guard against running multiple times within the same scheduled unit
-    if (config.lastRunTime != null) {
+    switch (config.frequency) {
+      case AutoExportFrequency.daily:
+        final scheduledToday = DateTime(now.year, now.month, now.day, targetHour, targetMinute);
+        if (!now.isBefore(scheduledToday)) {
+          return scheduledToday;
+        } else {
+          return scheduledToday.subtract(const Duration(days: 1));
+        }
+
+      case AutoExportFrequency.weekly:
+        final scheduledToday = DateTime(now.year, now.month, now.day, targetHour, targetMinute);
+        int daysBack = (now.weekday - config.dayOfWeek) % 7;
+        if (daysBack < 0) daysBack += 7;
+        var candidate = scheduledToday.subtract(Duration(days: daysBack));
+        if (candidate.isAfter(now)) {
+          candidate = candidate.subtract(const Duration(days: 7));
+        }
+        return candidate;
+
+      case AutoExportFrequency.monthly:
+        final daysThisMonth = DateUtils.getDaysInMonth(now.year, now.month);
+        final clampedDayThisMonth = config.dayOfMonth > daysThisMonth ? daysThisMonth : config.dayOfMonth;
+        final candidateThisMonth = DateTime(now.year, now.month, clampedDayThisMonth, targetHour, targetMinute);
+
+        if (!candidateThisMonth.isAfter(now)) {
+          return candidateThisMonth;
+        } else {
+          int prevYear = now.year;
+          int prevMonth = now.month - 1;
+          if (prevMonth < 1) {
+            prevMonth = 12;
+            prevYear--;
+          }
+          final daysPrevMonth = DateUtils.getDaysInMonth(prevYear, prevMonth);
+          final clampedDayPrevMonth = config.dayOfMonth > daysPrevMonth ? daysPrevMonth : config.dayOfMonth;
+          return DateTime(prevYear, prevMonth, clampedDayPrevMonth, targetHour, targetMinute);
+        }
+    }
+  }
+
+  /// Checks if scheduled export is due or was missed, and executes it idempotently without duplicates.
+  /// [isBackgroundWorker]: set to true when called directly by the WorkManager worker callback.
+  Future<AutoExportResult?> checkAndRunIfDue({
+    DateTime? currentTime,
+    bool isBackgroundWorker = false,
+  }) async {
+    final config = await loadConfig();
+    if (!config.isEnabled) {
+      AppLogger.log('KALS_AUTO_EXPORT', 'checkAndRunIfDue: Auto export is disabled. Skipping.');
+      return null;
+    }
+
+    final now = currentTime ?? DateTime.now();
+
+    // 1. Deduplication Guard: Check if export has already completed for this period
+    if (config.lastRunTime != null && (config.lastRunStatus == 'Completed' || config.lastRunStatus == 'success')) {
       final lastRun = config.lastRunTime!;
       switch (config.frequency) {
         case AutoExportFrequency.daily:
           if (lastRun.year == now.year && lastRun.month == now.month && lastRun.day == now.day) {
-            return null; // Already ran today
+            AppLogger.log('KALS_AUTO_EXPORT', 'checkAndRunIfDue: Already completed today at $lastRun. Skipping duplicate.');
+            return null;
           }
           break;
         case AutoExportFrequency.weekly:
           final diffDays = now.difference(lastRun).inDays;
-          if (diffDays < 6) return null; // Already ran this week
+          if (diffDays < 6) {
+            AppLogger.log('KALS_AUTO_EXPORT', 'checkAndRunIfDue: Already completed this week at $lastRun. Skipping duplicate.');
+            return null;
+          }
           break;
         case AutoExportFrequency.monthly:
           if (lastRun.year == now.year && lastRun.month == now.month) {
-            return null; // Already ran this month
+            AppLogger.log('KALS_AUTO_EXPORT', 'checkAndRunIfDue: Already completed this month at $lastRun. Skipping duplicate.');
+            return null;
           }
           break;
       }
     }
 
-    final targetHour = config.preferredTime.hour;
-    final targetMinute = config.preferredTime.minute;
-    final scheduledToday = DateTime(now.year, now.month, now.day, targetHour, targetMinute);
-
-    bool isDue = false;
-    switch (config.frequency) {
-      case AutoExportFrequency.daily:
-        isDue = now.isAfter(scheduledToday);
-        break;
-      case AutoExportFrequency.weekly:
-        isDue = now.weekday == config.dayOfWeek && now.isAfter(scheduledToday);
-        break;
-      case AutoExportFrequency.monthly:
-        final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
-        final effectiveDay = config.dayOfMonth > daysInMonth ? daysInMonth : config.dayOfMonth;
-        isDue = now.day == effectiveDay && now.isAfter(scheduledToday);
-        break;
+    // 2. Schedule Due Verification
+    if (isBackgroundWorker) {
+      // The background worker was triggered specifically for this scheduled cycle.
+      AppLogger.log('KALS_AUTO_EXPORT', 'Stage 3 (Background Execution): Worker triggered for ${config.frequency.displayName} export. Executing...');
+      return executeExport(customConfig: config, isManual: false);
     }
 
-    if (!isDue) return null;
+    // Foreground / App Startup Catch-Up Check:
+    final mostRecentDue = calculateMostRecentDueTime(config, from: now);
 
+    if (config.lastRunTime == null) {
+      if (config.enabledAt != null && config.enabledAt!.isAfter(mostRecentDue)) {
+        AppLogger.log('KALS_AUTO_EXPORT', 'checkAndRunIfDue: Schedule enabled at ${config.enabledAt} after mostRecentDue $mostRecentDue. Waiting for next cycle.');
+        return null;
+      }
+    } else {
+      final lastRun = config.lastRunTime!;
+      if (!lastRun.isBefore(mostRecentDue)) {
+        AppLogger.log('KALS_AUTO_EXPORT', 'checkAndRunIfDue: Last run ($lastRun) was at or after mostRecentDue ($mostRecentDue). Up to date.');
+        return null;
+      }
+    }
+
+    AppLogger.log('KALS_AUTO_EXPORT', 'checkAndRunIfDue: Catch-up export triggered for missed schedule at $mostRecentDue (current: $now).');
     return executeExport(customConfig: config, isManual: false);
+  }
+
+  /// Reconciles scheduler state on application startup and executes catch-up if a scheduled run was missed.
+  Future<bool> reconcileAndCatchUpIfDue() async {
+    try {
+      final config = await loadConfig();
+      if (!config.isEnabled) return false;
+
+      AppLogger.log('KALS_AUTO_EXPORT', 'Startup: Reconciling auto export scheduler state...');
+      final runResult = await checkAndRunIfDue();
+
+      final nextRun = calculateNextRun(config);
+      await AutoExportBackgroundScheduler.scheduleOrUpdate(
+        config,
+        nextRunTime: nextRun,
+      );
+      return runResult != null && runResult.success;
+    } catch (e, stack) {
+      AppLogger.error('KALS_AUTO_EXPORT', 'Startup reconciliation error: $e', e, stack);
+      return false;
+    }
   }
 
   /// Executes export with complete validation, atomic finalization, and notifications.
@@ -386,6 +552,7 @@ class AutomaticExportService {
     bool isManual = false,
   }) async {
     if (_isExecuting) {
+      AppLogger.log('KALS_AUTO_EXPORT', 'executeExport: Export already in progress. Skipping concurrent request.');
       return AutoExportResult(
         success: false,
         errorMessage: 'Export job already in progress.',
@@ -395,11 +562,21 @@ class AutomaticExportService {
     }
 
     _isExecuting = true;
+    final stopwatch = Stopwatch()..start();
     final config = customConfig ?? await loadConfig();
     final now = DateTime.now();
     final db = appDatabase;
 
     try {
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 4 (Export): Starting ${isManual ? "manual" : "automatic"} export. '
+        'Format: ${config.format.displayName}, Scope: ${config.scope.displayName}, '
+        'Retention: ${config.retentionCount}',
+      );
+
+      await db.setSetting('auto_export_last_status', 'Running');
+
       final exportDir = await StorageHelper.getDownloadsDirectory();
       if (!await exportDir.exists()) {
         await exportDir.create(recursive: true);
@@ -411,14 +588,39 @@ class AutomaticExportService {
       if (config.format == AutoExportFormat.excel) {
         // Scope determination
         DateTime? startDate;
-        DateTime? endDate;
-        if (config.scope == AutoExportScope.currentMonth) {
-          startDate = DateTime(now.year, now.month, 1);
-          endDate = DateTime(now.year, now.month + 1, 1).subtract(const Duration(milliseconds: 1));
+        DateTime? endDate = now;
+        final todayStart = DateTime(now.year, now.month, now.day);
+        final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+        switch (config.scope) {
+          case AutoExportScope.last7Days:
+            startDate = todayStart.subtract(const Duration(days: 7));
+            endDate = todayEnd;
+            break;
+          case AutoExportScope.last30Days:
+            startDate = todayStart.subtract(const Duration(days: 30));
+            endDate = todayEnd;
+            break;
+          case AutoExportScope.last90Days:
+            startDate = todayStart.subtract(const Duration(days: 90));
+            endDate = todayEnd;
+            break;
+          case AutoExportScope.lastYear:
+            startDate = DateTime(now.year - 1, now.month, now.day);
+            endDate = todayEnd;
+            break;
+          case AutoExportScope.currentMonth:
+            startDate = DateTime(now.year, now.month, 1);
+            endDate = DateTime(now.year, now.month + 1, 1).subtract(const Duration(milliseconds: 1));
+            break;
+          case AutoExportScope.allTransactions:
+            startDate = null;
+            endDate = null;
+            break;
         }
 
         // Generate workbook directly via ExcelExportService (saves to public Downloads)
         final baseName = 'Kals_MoneyManager_Export_$dateStr.xlsx';
+        AppLogger.log('KALS_AUTO_EXPORT', 'Stage 4 (Export): Generating Excel workbook "$baseName"...');
         final excelFile = await excelExportService.generateExcelWorkbook(
           filter: ExcelExportFilter(
             startDate: startDate,
@@ -442,6 +644,7 @@ class AutomaticExportService {
         finalFile = excelFile;
       } else {
         // Complete Application Backup
+        AppLogger.log('KALS_AUTO_EXPORT', 'Stage 4 (Export): Generating full JSON backup payload...');
         final payload = await backupService.createBackupPayload();
         final jsonStr = const JsonEncoder.withIndent('  ').convert(payload.toMap());
 
@@ -466,6 +669,8 @@ class AutomaticExportService {
       final fileSize = await finalFile.length();
       final finalFileName = p.basename(finalFile.path);
 
+      AppLogger.log('KALS_AUTO_EXPORT', 'Stage 4 (Export): File generated and verified successfully: ${finalFile.path} ($fileSize bytes)');
+
       // Prune old exports according to retention policy
       await _pruneOldExports(
         directory: exportDir,
@@ -477,6 +682,7 @@ class AutomaticExportService {
       // Update metadata in database
       final nowIso = now.toIso8601String();
       await db.setSetting('auto_export_last_run', nowIso);
+      await db.setSetting('auto_export_last_success', nowIso);
       await db.setSetting('auto_export_last_status', 'success');
       await db.setSetting('auto_export_last_file_path', finalFile.path);
       await db.setSetting('auto_export_last_file_size', fileSize.toString());
@@ -499,21 +705,32 @@ class AutomaticExportService {
             ? 'Automatic export completed. Your Excel file is ready.'
             : 'Your local backup has been created successfully ($finalFileName).';
 
-        await notificationService.showExportNotification(
-          title: title,
-          body: body,
-          isSuccess: true,
-          filePath: finalFile.path,
-        );
+        try {
+          await notificationService.showExportNotification(
+            title: title,
+            body: body,
+            isSuccess: true,
+            filePath: finalFile.path,
+          );
+        } catch (ne) {
+          AppLogger.warn('KALS_AUTO_EXPORT', 'Notification display warning: $ne');
+        }
       }
 
       // Schedule next execution cycle
-      if (config.isEnabled) {
+      if (config.isEnabled && !isManual) {
+        final nextRun = calculateNextRun(config);
         await AutoExportBackgroundScheduler.scheduleOrUpdate(
           config,
-          nextRunTime: calculateNextRun(config),
+          nextRunTime: nextRun,
         );
       }
+
+      final durationMs = stopwatch.elapsedMilliseconds;
+      AppLogger.log(
+        'KALS_AUTO_EXPORT',
+        'Stage 5 (Completion): Export finished successfully in ${durationMs}ms. File: ${finalFile.path}',
+      );
 
       return AutoExportResult(
         success: true,
@@ -521,22 +738,23 @@ class AutomaticExportService {
         timestamp: now,
         fileSize: fileSize,
       );
-    } catch (e) {
+    } catch (e, stack) {
+      final durationMs = stopwatch.elapsedMilliseconds;
       final errorMsg = e.toString();
-      if (kDebugMode) {
-        debugPrint('AutomaticExportService: Export failed: $e');
-      }
+      AppLogger.error('KALS_AUTO_EXPORT', 'Stage 4/5 (Export): Failed after ${durationMs}ms: $errorMsg', e, stack);
 
       await db.setSetting('auto_export_last_run', now.toIso8601String());
-      await db.setSetting('auto_export_last_status', 'failed');
+      await db.setSetting('auto_export_last_status', 'Failed');
       await db.setSetting('auto_export_last_error', errorMsg);
 
       if (config.notifyOnComplete) {
-        await notificationService.showExportNotification(
-          title: 'Kals Money Manager',
-          body: 'Automatic export failed. Your previous exports have been preserved.',
-          isSuccess: false,
-        );
+        try {
+          await notificationService.showExportNotification(
+            title: 'Kals Money Manager',
+            body: 'Automatic export failed: $errorMsg',
+            isSuccess: false,
+          );
+        } catch (_) {}
       }
 
       return AutoExportResult(
@@ -561,10 +779,11 @@ class AutomaticExportService {
       final list = await directory.list().toList();
       final matchingFiles = <File>[];
 
+      final legacyPrefix = prefix.replaceFirst('Kals_', 'Kals_V2_');
       for (final entity in list) {
         if (entity is File) {
           final name = p.basename(entity.path);
-          if (name.startsWith(prefix) && name.endsWith(extension)) {
+          if ((name.startsWith(prefix) || name.startsWith(legacyPrefix)) && name.endsWith(extension)) {
             matchingFiles.add(entity);
           }
         }

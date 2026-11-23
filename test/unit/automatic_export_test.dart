@@ -423,7 +423,7 @@ void main() {
       // Verify Main Controls
       expect(find.text('Enable automatic export'), findsOneWidget);
       expect(find.text('EXPORT SPECIFICATIONS'), findsOneWidget);
-      expect(find.text('All Transactions'), findsOneWidget);
+      expect(find.text('All history'), findsOneWidget);
       expect(find.text('Excel Workbook (.xlsx)'), findsOneWidget);
       expect(find.text('Save Location'), findsOneWidget);
       expect(find.text('Notify me after export'), findsOneWidget);
@@ -453,6 +453,33 @@ void main() {
       expect(backupProvider.errorMessage, isNull);
       // Success dialog appears
       expect(find.text('Export Completed'), findsOneWidget);
+    });
+
+    testWidgets('AutomaticExportScreen renders without RenderFlex overflow on 320px and 1.5x font scale', (tester) async {
+      tester.view.physicalSize = const Size(320, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        tester.platformDispatcher.clearTextScaleFactorTestValue();
+      });
+
+      await tester.pumpWidget(
+        buildTestApp(const AutomaticExportScreen()),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Automatic Export'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // Verify 1.5x font scale
+      tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final err = tester.takeException();
+      expect(err, isNull);
     });
 
     testWidgets('ExportBottomSheet renders 3 options and excludes backup/restore', (tester) async {

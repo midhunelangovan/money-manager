@@ -125,11 +125,11 @@ void main() {
 
       await tester.enterText(amountFieldFinder, '1070.00');
       await tester.pump();
-      expect(find.text('1070.00'), findsOneWidget);
+      expect(find.text('1,070.00'), findsOneWidget);
 
       await tester.enterText(amountFieldFinder, '99999999.99');
       await tester.pump();
-      expect(find.text('99999999.99'), findsOneWidget);
+      expect(find.text('9,99,99,999.99'), findsOneWidget);
     });
 
     testWidgets('Category selection: tap selects item with clean border and checkmark, clears previous', (tester) async {

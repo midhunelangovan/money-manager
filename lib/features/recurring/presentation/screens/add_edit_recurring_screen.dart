@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/date_formatter.dart';
 import '../../../../core/utilities/id_generator.dart';
+import '../../../../core/utilities/indian_number_formatter.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/amount_input.dart';
 import '../../../../core/widgets/app_card.dart';
@@ -42,6 +43,7 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
   String? _selectedCategoryId;
   bool _remindMe = false;
   int _reminderLeadDays = 0;
+  TimeOfDay _reminderTime = const TimeOfDay(hour: 9, minute: 0);
   bool _isSaving = false;
 
   @override
@@ -50,7 +52,9 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
     final rec = widget.initialRecurring;
     _descriptionController = TextEditingController(text: rec?.description ?? '');
     _amountController = TextEditingController(
-      text: rec != null ? (rec.amount.units / 100).toStringAsFixed(2) : '',
+      text: rec != null
+          ? IndianNumberFormatter.formatUnits(rec.amount.units, includeDecimals: true, trimZeroDecimals: false)
+          : '',
     );
     _type = rec?.transactionType ?? CategoryType.expense;
     _frequency = rec?.frequency ?? RecurringFrequency.monthly;
@@ -110,11 +114,12 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
       return;
     }
 
-    final amountParsed = Money.tryParse(_amountController.text);
-    if (amountParsed == null || amountParsed.units <= 0) {
+    final amountUnits = IndianNumberFormatter.parseToUnits(_amountController.text);
+    if (amountUnits <= 0) {
       AppSnackBar.showError(context, 'Please enter a valid amount greater than zero');
       return;
     }
+    final amountParsed = Money.fromUnits(amountUnits);
 
     if (_selectedAccountId == null) {
       AppSnackBar.showError(context, 'Please select an account');
@@ -436,7 +441,7 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Start Date / Next Run',
+                            'Start Date',
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                           InkWell(
@@ -454,6 +459,33 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
                                   const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.primary),
                                 ],
                               ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Next Due Date',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  DateFormatter.formatDate(widget.initialRecurring?.nextExecutionDate ?? _startDate),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.event_available_rounded, size: 18, color: AppColors.primary),
+                              ],
                             ),
                           ),
                         ],
@@ -517,6 +549,41 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
                       ),
                       if (_remindMe) ...[
                         const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Reminder Time',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                            InkWell(
+                              onTap: () async {
+                                final picked = await showTimePicker(
+                                  context: context,
+                                  initialTime: _reminderTime,
+                                );
+                                if (picked != null) {
+                                  setState(() => _reminderTime = picked);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      _reminderTime.format(context),
+                                      style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.access_time_rounded, size: 18, color: AppColors.primary),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         Text(
                           'NOTIFICATION TIMING',
                           style: TextStyle(
@@ -526,7 +593,7 @@ class _AddEditRecurringScreenState extends State<AddEditRecurringScreen> {
                             color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,

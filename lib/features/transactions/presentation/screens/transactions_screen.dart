@@ -629,7 +629,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Widget build(BuildContext context) {
     final txProvider = context.watch<TransactionProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canPop = Navigator.canPop(context);
     final hasActiveFilters = txProvider.filter.hasActiveFilters;
 
     return Scaffold(
@@ -641,19 +640,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           AppHeader(
             showBackButton: false,
             leading: IconButton(
-              icon: Icon(
-                canPop ? Icons.arrow_back_rounded : Icons.menu_rounded,
+              icon: const Icon(
+                Icons.menu_rounded,
                 color: Colors.white,
                 size: 26,
               ),
-              tooltip: canPop ? 'Back' : 'Navigation Menu',
-              onPressed: () {
-                if (canPop) {
-                  Navigator.pop(context);
-                } else {
-                  MainNavigationService.openDrawer();
-                }
-              },
+              tooltip: 'Navigation Menu',
+              onPressed: MainNavigationService.openDrawer,
             ),
             title: 'Transactions',
             actions: [
@@ -824,8 +817,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ),
           );
         },
-        backgroundColor: AppColors.accentYellow,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.floatingActionButton(isDark),
+        foregroundColor: AppColors.floatingActionButtonIcon(isDark),
         shape: const CircleBorder(),
         elevation: 4,
         child: const Icon(Icons.add_rounded, size: 32),

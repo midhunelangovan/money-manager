@@ -7,8 +7,15 @@ import '../../features/backup/presentation/screens/automatic_export_screen.dart'
 import '../../features/backup/presentation/screens/export_transactions_screen.dart';
 import '../../features/transactions/domain/entities/transaction.dart';
 import '../theme/app_colors.dart';
+import '../utilities/app_snack_bar.dart';
 import 'export_success_dialog.dart';
 import 'period_selector.dart';
+
+enum ExportSheetAction {
+  exportTransactions,
+  exportAllTransactions,
+  automaticExport,
+}
 
 /// Modal bottom sheet presenting transaction export options.
 /// Strictly limited to transaction export (no database backup/restore options).
@@ -38,8 +45,8 @@ class ExportBottomSheet extends StatelessWidget {
     String? accountId,
     String? accountName,
     LedgerItemType? typeFilter,
-  }) {
-    return showModalBottomSheet(
+  }) async {
+    final action = await showModalBottomSheet<ExportSheetAction>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -52,21 +59,41 @@ class ExportBottomSheet extends StatelessWidget {
         typeFilter: typeFilter,
       ),
     );
+
+    if (action == null || !context.mounted) return;
+
+    switch (action) {
+      case ExportSheetAction.exportTransactions:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ExportTransactionsScreen(
+              initialPeriodMode: periodMode,
+              initialAnchorDate: anchorDate,
+              initialCustomDateRange: customDateRange,
+              initialAccountId: accountId,
+              initialAccountName: accountName,
+              initialTypeFilter: typeFilter,
+            ),
+          ),
+        );
+        break;
+      case ExportSheetAction.exportAllTransactions:
+        await _executeExportAll(context);
+        break;
+      case ExportSheetAction.automaticExport:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AutomaticExportScreen(),
+          ),
+        );
+        break;
+    }
   }
 
-  Future<void> _exportAllTransactions(BuildContext context) async {
-    final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
+  static Future<void> _executeExportAll(BuildContext context) async {
     final backupProvider = context.read<BackupProvider>();
 
-    navigator.pop(); // Close sheet
-
-    scaffoldMessenger.showSnackBar(
-      const SnackBar(
-        content: Text('Exporting complete transaction history...'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    AppSnackBar.showInfo(context, 'Exporting complete transaction history...');
 
     try {
       final file = await backupProvider.exportToExcel(
@@ -81,21 +108,14 @@ class ExportBottomSheet extends StatelessWidget {
           type: ExportFileType.excel,
         );
       } else if (context.mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(backupProvider.errorMessage ?? 'Failed to export transactions.'),
-            backgroundColor: AppColors.expense,
-          ),
+        AppSnackBar.showError(
+          context,
+          backupProvider.errorMessage ?? 'Failed to export transactions.',
         );
       }
     } catch (e) {
       if (context.mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: AppColors.expense,
-          ),
-        );
+        AppSnackBar.showError(context, 'Export failed: $e');
       }
     }
   }
@@ -175,21 +195,7 @@ class ExportBottomSheet extends StatelessWidget {
                 iconColor: primaryAccent,
                 title: 'Export Transactions',
                 subtitle: 'Select a period and preview transactions before exporting.',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ExportTransactionsScreen(
-                        initialPeriodMode: periodMode,
-                        initialAnchorDate: anchorDate,
-                        initialCustomDateRange: customDateRange,
-                        initialAccountId: accountId,
-                        initialAccountName: accountName,
-                        initialTypeFilter: typeFilter,
-                      ),
-                    ),
-                  );
-                },
+                onTap: () => Navigator.of(context).pop(ExportSheetAction.exportTransactions),
               ),
               const SizedBox(height: 10),
 
@@ -201,7 +207,7 @@ class ExportBottomSheet extends StatelessWidget {
                 iconColor: AppColors.income,
                 title: 'Export All Transactions',
                 subtitle: 'Export the complete transaction history.',
-                onTap: () => _exportAllTransactions(context),
+                onTap: () => Navigator.of(context).pop(ExportSheetAction.exportAllTransactions),
               ),
               const SizedBox(height: 10),
 
@@ -213,14 +219,7 @@ class ExportBottomSheet extends StatelessWidget {
                 iconColor: Colors.purple,
                 title: 'Automatic Export',
                 subtitle: 'Configure and manage scheduled local exports.',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const AutomaticExportScreen(),
-                    ),
-                  );
-                },
+                onTap: () => Navigator.of(context).pop(ExportSheetAction.automaticExport),
               ),
             ],
           ),

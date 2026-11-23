@@ -77,7 +77,7 @@ class ExcelExportService {
     }
 
     summarySheet.appendRow([
-      TextCellValue("Kal's Money Manager - Financial Report"),
+      TextCellValue("${AppConstants.appName} - Financial Report"),
     ]);
     summarySheet.appendRow([
       TextCellValue('Generated on: ${DateFormatter.formatIsoDateTime(DateTime.now())}'),
