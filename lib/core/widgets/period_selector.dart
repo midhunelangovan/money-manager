@@ -120,7 +120,7 @@ class PeriodSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final primaryBrand = isDark ? theme.colorScheme.primary : AppColors.primary;
+    final primaryBrand = AppColors.primaryAction(isDark);
     final inactiveText = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     final showJumpAction = selectedPeriod != TimePeriod.period && effectiveCanJumpToToday && onToday != null;
@@ -304,7 +304,6 @@ class _MonthPickerDialogState extends State<MonthPickerDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.colorScheme.primary;
     final now = DateTime.now();
 
     return Dialog(
@@ -364,16 +363,16 @@ class _MonthPickerDialogState extends State<MonthPickerDialog> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? (isDark ? primaryColor : AppColors.primary)
+                          ? AppColors.primaryAction(isDark)
                           : (isCurrentMonth
-                              ? (isDark ? primaryColor.withValues(alpha: 0.15) : AppColors.primary.withValues(alpha: 0.08))
+                              ? AppColors.primaryAction(isDark).withValues(alpha: isDark ? 0.15 : 0.08)
                               : Colors.transparent),
                       borderRadius: BorderRadius.circular(12),
                       border: isSelected
                           ? null
                           : Border.all(
                               color: isCurrentMonth
-                                  ? (isDark ? primaryColor.withValues(alpha: 0.5) : AppColors.primary.withValues(alpha: 0.3))
+                                  ? AppColors.primaryAction(isDark).withValues(alpha: isDark ? 0.5 : 0.3)
                                   : (isDark ? AppColors.darkBorderSubtle : AppColors.lightBorder),
                               width: isCurrentMonth ? 1.5 : 1,
                             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 
 /// Standard unified text field component for Kal's Money Manager.
@@ -28,6 +29,7 @@ class AppTextField extends StatelessWidget {
   final EdgeInsetsGeometry? contentPadding;
   final Color? fillColor;
   final double borderRadius;
+  final List<TextInputFormatter>? inputFormatters;
 
   const AppTextField({
     super.key,
@@ -55,6 +57,7 @@ class AppTextField extends StatelessWidget {
     this.contentPadding,
     this.fillColor,
     this.borderRadius = 12.0,
+    this.inputFormatters,
   });
 
   @override
@@ -90,6 +93,7 @@ class AppTextField extends StatelessWidget {
           maxLines: maxLines,
           minLines: minLines,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           textInputAction: textInputAction,
           textCapitalization: textCapitalization,
           onChanged: onChanged,

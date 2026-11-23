@@ -54,6 +54,8 @@ scratch/
 *.sqlite3
 *.xlsx
 *.csv
+*.mmb
+*.apk
 *.jks
 *.keystore
 *.key

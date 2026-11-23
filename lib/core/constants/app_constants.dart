@@ -1,6 +1,6 @@
 class AppConstants {
-  static const String appName = "Kal's Money Manager Dev";
-  static const String appVersion = '2.0.0-dev';
+  static const String appName = 'Kals Money Manager';
+  static const String appVersion = '2.0.0';
   static const int databaseVersion = 1;
   static const int backupSchemaVersion = 1;
   static const String backupFileExtension = '.mmb';

@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 import '../../features/categories/presentation/screens/categories_screen.dart';
 import '../../features/recurring/presentation/screens/recurring_screen.dart';
 import '../../features/reminders/presentation/screens/reminders_screen.dart';
+import '../../features/reports/presentation/screens/reports_screen.dart';
 import '../../features/settings/presentation/providers/settings_provider.dart';
+import '../../features/settings/presentation/screens/about_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
-import '../constants/app_constants.dart';
 import '../navigation/navigation_service.dart';
 import '../theme/app_colors.dart';
 import 'profile_avatar.dart';
@@ -114,14 +115,16 @@ class AppDrawer extends StatelessWidget {
                     context,
                     icon: Icons.insert_chart_rounded,
                     label: 'Reports',
-                    isSelected: activeTab == 3,
+                    isSelected: false,
                     selectedBg: selectedBg,
                     selectedTextColor: selectedTextColor,
                     textPrimary: textPrimary,
                     textSecondary: textSecondary,
                     onTap: () {
-                      Navigator.pop(context);
-                      MainNavigationService.navigateToTab(context, 3);
+                      MainNavigationService.openDrawerDestination(
+                        context,
+                        const ReportsScreen(),
+                      );
                     },
                   ),
                   _buildMenuItem(
@@ -134,9 +137,9 @@ class AppDrawer extends StatelessWidget {
                     textPrimary: textPrimary,
                     textSecondary: textSecondary,
                     onTap: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+                      MainNavigationService.openDrawerDestination(
+                        context,
+                        const CategoriesScreen(),
                       );
                     },
                   ),
@@ -150,9 +153,9 @@ class AppDrawer extends StatelessWidget {
                     textPrimary: textPrimary,
                     textSecondary: textSecondary,
                     onTap: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const RecurringScreen()),
+                      MainNavigationService.openDrawerDestination(
+                        context,
+                        const RecurringScreen(),
                       );
                     },
                   ),
@@ -166,9 +169,9 @@ class AppDrawer extends StatelessWidget {
                     textPrimary: textPrimary,
                     textSecondary: textSecondary,
                     onTap: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const RemindersScreen()),
+                      MainNavigationService.openDrawerDestination(
+                        context,
+                        const RemindersScreen(),
                       );
                     },
                   ),
@@ -182,9 +185,9 @@ class AppDrawer extends StatelessWidget {
                     textPrimary: textPrimary,
                     textSecondary: textSecondary,
                     onTap: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                      MainNavigationService.openDrawerDestination(
+                        context,
+                        const SettingsScreen(),
                       );
                     },
                   ),
@@ -198,8 +201,10 @@ class AppDrawer extends StatelessWidget {
                     textPrimary: textPrimary,
                     textSecondary: textSecondary,
                     onTap: () {
-                      Navigator.pop(context);
-                      _showAboutDialog(context);
+                      MainNavigationService.openDrawerDestination(
+                        context,
+                        const AboutScreen(),
+                      );
                     },
                   ),
                 ],
@@ -249,69 +254,6 @@ class AppDrawer extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         visualDensity: const VisualDensity(horizontal: -2, vertical: -1.5),
         onTap: onTap,
-      ),
-    );
-  }
-
-  void _showAboutDialog(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? AppColors.darkSurfaceCard : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset('assets/icons/app_icon.png', width: 36, height: 36),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              AppConstants.appName,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Version ${AppConstants.appVersion}',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Database Schema v${AppConstants.databaseVersion} (SQLite Offline)',
-              style: TextStyle(
-                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '100% Offline Personal Finance Ledger. No tracking, no cloud servers, strict financial auditability.',
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
       ),
     );
   }

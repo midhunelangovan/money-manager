@@ -31,6 +31,8 @@ class SettingsProvider extends ChangeNotifier {
   String? _defaultTransactionAccountId;
   TimePeriod _defaultPeriod = TimePeriod.week;
   LedgerTabType _defaultTransactionType = LedgerTabType.expenses;
+  bool _showRecentTransactions = true;
+  bool _isMinimalMode = false;
 
   final AppDatabase? _appDatabase;
   Future<void>? _loadFuture;
@@ -55,6 +57,8 @@ class SettingsProvider extends ChangeNotifier {
   String? get defaultTransactionAccountId => _defaultTransactionAccountId;
   TimePeriod get defaultPeriod => _defaultPeriod;
   LedgerTabType get defaultTransactionType => _defaultTransactionType;
+  bool get showRecentTransactions => _showRecentTransactions;
+  bool get isMinimalMode => _isMinimalMode;
 
   AppDatabase get _db => _appDatabase ?? AppDatabase.instance;
 
@@ -128,6 +132,21 @@ class SettingsProvider extends ChangeNotifier {
         final found = LedgerTabType.values.where((t) => t.name == defaultTypeStr).firstOrNull;
         if (found != null) _defaultTransactionType = found;
       }
+
+      final showRecentStr = await db.getSetting('show_recent_transactions');
+      if (showRecentStr != null) {
+        _showRecentTransactions = showRecentStr == 'true';
+      } else {
+        _showRecentTransactions = true;
+      }
+
+      final minimalStr = await db.getSetting('is_minimal_mode');
+      if (minimalStr != null) {
+        _isMinimalMode = minimalStr == 'true';
+      } else {
+        _isMinimalMode = false;
+      }
+      AppColors.isMinimalMode = _isMinimalMode;
 
       // Reconcile and validate primary & selected account IDs against actual active persisted accounts
       try {
@@ -270,6 +289,23 @@ class SettingsProvider extends ChangeNotifier {
       _isAppLockEnabled = enabled;
       notifyListeners();
       _db.setSetting('app_lock_enabled', enabled ? 'true' : 'false');
+    }
+  }
+
+  void setShowRecentTransactions(bool show) {
+    if (_showRecentTransactions != show) {
+      _showRecentTransactions = show;
+      notifyListeners();
+      _db.setSetting('show_recent_transactions', show ? 'true' : 'false');
+    }
+  }
+
+  void setMinimalMode(bool enabled) {
+    if (_isMinimalMode != enabled) {
+      _isMinimalMode = enabled;
+      AppColors.isMinimalMode = enabled;
+      notifyListeners();
+      _db.setSetting('is_minimal_mode', enabled ? 'true' : 'false');
     }
   }
 }

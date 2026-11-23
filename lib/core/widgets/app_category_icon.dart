@@ -33,16 +33,39 @@ class AppCategoryIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? AppColors.darkPrimary : AppColors.primary;
-    final surfaceColor = isDark ? AppColors.darkBackground : Colors.white;
+    final isMinimal = AppColors.isMinimalMode;
 
-    final effectiveColor = color ?? const Color(0xFF475569);
+    final primaryColor = isMinimal
+        ? (isDark ? AppColors.minimalDarkPrimary : AppColors.minimalLightPrimary)
+        : (isDark ? AppColors.darkPrimary : AppColors.primary);
+    final surfaceColor = AppColors.background(isDark);
+
     final isCircle = borderRadius == null;
 
-    final defaultBg = backgroundColor ??
-        (showBackground
-            ? effectiveColor
-            : Colors.transparent);
+    final defaultBg = isMinimal
+        ? (showBackground
+            ? (isDark ? AppColors.minimalDarkSurfaceElevated : AppColors.minimalLightSurfaceElevated)
+            : Colors.transparent)
+        : (backgroundColor ??
+            (showBackground
+                ? AppColors.categoryIconBackground(color, isDark)
+                : Colors.transparent));
+
+    final glyphColor = isMinimal
+        ? AppColors.categoryIconGlyph(isDark)
+        : Colors.white;
+
+    final borderDecoration = isSelected
+        ? Border.all(
+            color: primaryColor,
+            width: 2.0,
+          )
+        : (isMinimal && showBackground
+            ? Border.all(
+                color: isDark ? AppColors.minimalDarkBorder : AppColors.minimalLightBorder,
+                width: 1.0,
+              )
+            : null);
 
     Widget circleContainer = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -52,18 +75,13 @@ class AppCategoryIcon extends StatelessWidget {
         color: defaultBg,
         shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
         borderRadius: isCircle ? null : borderRadius,
-        border: isSelected
-            ? Border.all(
-                color: primaryColor,
-                width: 2.0,
-              )
-            : null,
+        border: borderDecoration,
       ),
       child: Center(
         child: Icon(
           icon,
           size: iconSize,
-          color: Colors.white,
+          color: glyphColor,
         ),
       ),
     );
@@ -89,11 +107,13 @@ class AppCategoryIcon extends StatelessWidget {
                   width: 1.5,
                 ),
               ),
-              child: const Center(
+              child: Center(
                 child: Icon(
                   Icons.check_rounded,
                   size: 11,
-                  color: Colors.white,
+                  color: isMinimal
+                      ? (isDark ? AppColors.minimalDarkBackground : Colors.white)
+                      : Colors.white,
                 ),
               ),
             ),

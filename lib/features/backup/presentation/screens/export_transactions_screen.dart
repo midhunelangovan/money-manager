@@ -7,6 +7,7 @@ import '../../../../core/constants/app_category_icons.dart';
 import '../../../../core/constants/app_currency.dart';
 import '../../../../core/extensions/date_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/app_bottom_button.dart';
 import '../../../../core/widgets/app_category_icon.dart';
@@ -408,14 +409,10 @@ class _ExportTransactionsScreenState extends State<ExportTransactionsScreen> {
   Future<void> _exportTransactions() async {
     if (_isExporting) return;
 
-    final messenger = ScaffoldMessenger.of(context);
-
     if (_previewItems.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No transactions found matching the selected period and filters to export.'),
-          backgroundColor: AppColors.expense,
-        ),
+      AppSnackBar.showError(
+        context,
+        'No transactions found matching the selected period and filters to export.',
       );
       return;
     }
@@ -434,12 +431,7 @@ class _ExportTransactionsScreenState extends State<ExportTransactionsScreen> {
       _isExporting = true;
     });
 
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text('Generating Excel export...'),
-        duration: Duration(seconds: 1),
-      ),
-    );
+    AppSnackBar.showInfo(context, 'Generating Excel export...');
 
     File? file;
     try {
@@ -466,11 +458,9 @@ class _ExportTransactionsScreenState extends State<ExportTransactionsScreen> {
         type: ExportFileType.excel,
       );
     } else {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(backupProvider.errorMessage ?? 'Export failed. Please check storage permissions.'),
-          backgroundColor: AppColors.expense,
-        ),
+      AppSnackBar.showError(
+        context,
+        backupProvider.errorMessage ?? 'Export failed. Please check storage permissions.',
       );
     }
   }
@@ -486,37 +476,45 @@ class _ExportTransactionsScreenState extends State<ExportTransactionsScreen> {
         ? _previewItems
         : _previewItems.take(8).toList();
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-      body: Column(
-        children: [
-          // Full-screen curved brand header
-          AppHeader(
-            title: 'Export Transactions',
-            centerTitle: false,
-            showBackButton: false,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).maybePop(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.history_rounded, color: Colors.white, size: 24),
-                tooltip: 'Export History',
+    return PopScope(
+      canPop: !_isExporting,
+      child: Scaffold(
+        backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+        body: Column(
+          children: [
+            // Full-screen curved brand header
+            AppHeader(
+              title: 'Export Transactions',
+              centerTitle: false,
+              showBackButton: false,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                tooltip: 'Back',
+                onPressed: _isExporting
+                    ? null
+                    : () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+                      },
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ExportHistoryScreen()),
-                  );
-                },
               ),
-              const SizedBox(width: 8),
-            ],
-          ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.history_rounded, color: Colors.white, size: 24),
+                  tooltip: 'Export History',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ExportHistoryScreen()),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
 
           // Scrollable content with the 3 clear sections
           Expanded(
@@ -857,10 +855,11 @@ class _ExportTransactionsScreenState extends State<ExportTransactionsScreen> {
             foregroundColor: Colors.white,
             width: double.infinity,
             isLoading: _isExporting,
-            onPressed: _previewItems.isEmpty ? null : _exportTransactions,
+            onPressed: (_previewItems.isEmpty || _isExporting) ? null : _exportTransactions,
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -904,8 +903,8 @@ class _ExportTransactionsScreenState extends State<ExportTransactionsScreen> {
     final isTransfer = item.type == LedgerItemType.transfer;
 
     final color = isExpense
-        ? AppColors.expense
-        : (isIncome ? AppColors.income : const Color(0xFF6B7280));
+        ? AppColors.expenseColor(isDark)
+        : (isIncome ? AppColors.incomeColor(isDark) : (AppColors.isMinimalMode ? AppColors.textSecondary(isDark) : const Color(0xFF6B7280)));
 
     final prefix = isExpense ? '-' : (isIncome ? '+' : '');
     final amountFormatted = Money.fromUnits(item.amountUnits).format(currency: currency);

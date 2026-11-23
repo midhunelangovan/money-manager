@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/date_formatter.dart';
@@ -148,7 +149,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
         // ignore: deprecated_member_use
         await Share.shareXFiles(
           [XFile(file.path)],
-          text: "Kal's Money Manager Export: ${file.path.split(Platform.pathSeparator).last}",
+          text: '${AppConstants.appName} Export: ${file.path.split(Platform.pathSeparator).last}',
         );
       }
     } catch (e) {

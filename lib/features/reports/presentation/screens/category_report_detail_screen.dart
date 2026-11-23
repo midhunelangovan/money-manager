@@ -126,7 +126,7 @@ class _CategoryReportDetailScreenState extends State<CategoryReportDetailScreen>
                     AppCategoryIcon(
                       icon: widget.categoryIcon,
                       color: Colors.white,
-                      backgroundColor: widget.categoryColor.withValues(alpha: 0.3),
+                      backgroundColor: AppColors.isMinimalMode ? null : widget.categoryColor.withValues(alpha: 0.3),
                       size: 44,
                       iconSize: 24,
                       borderRadius: BorderRadius.circular(12),
@@ -295,7 +295,7 @@ class _CategoryReportDetailScreenState extends State<CategoryReportDetailScreen>
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w700,
-                                                color: isDark ? AppColors.darkTextSecondary : AppColors.primary,
+                                                color: isDark ? AppColors.darkTextSecondary : AppColors.primaryAction(isDark),
                                               ),
                                             ),
                                           ),

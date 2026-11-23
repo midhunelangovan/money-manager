@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/navigation/navigation_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/id_generator.dart';
+import '../../../../core/utilities/indian_number_formatter.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
@@ -51,7 +51,9 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
     final currentUnits = found?.calculatedBalance.units ?? acc?.openingBalance.units ?? 0;
 
     _balanceController = TextEditingController(
-      text: acc != null ? (currentUnits / 100).toStringAsFixed(2) : '0.00',
+      text: acc != null
+          ? IndianNumberFormatter.formatUnits(currentUnits, includeDecimals: true, trimZeroDecimals: false)
+          : '0.00',
     );
     _selectedType = acc?.accountType ?? AccountType.bank;
     _selectedColor = acc?.color ?? AppColors.categoryPalette.first.toARGB32();
@@ -71,7 +73,8 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
       return;
     }
 
-    final balanceParsed = Money.tryParse(_balanceController.text) ?? const Money.zero();
+    final balanceUnits = IndianNumberFormatter.parseToUnits(_balanceController.text);
+    final balanceParsed = Money.fromUnits(balanceUnits);
 
     setState(() => _isSaving = true);
 
@@ -352,7 +355,7 @@ class _AddEditAccountScreenState extends State<AddEditAccountScreen> {
                                 controller: _balanceController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
                                 inputFormatters: [
-                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                                  IndianNumberTextInputFormatter(maxDecimalDigits: 2),
                                 ],
                                 style: AppTypography.displaySmall.copyWith(
                                   fontWeight: FontWeight.w800,

@@ -20,6 +20,7 @@ import '../../../transactions/domain/entities/transaction.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/presentation/screens/add_edit_transaction_screen.dart';
 import '../../../transactions/presentation/screens/period_transactions_screen.dart';
+import '../../../transactions/presentation/widgets/transaction_list_item.dart';
 import '../models/dashboard_filter_state.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -52,7 +53,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _lastKnownSelectedAccountId = settings.dashboardSelectedAccountId;
 
     if (accountProvider.accountsWithBalances.isEmpty && !accountProvider.isLoading) {
-      accountProvider.loadAccounts();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          accountProvider.loadAccounts();
+        }
+      });
     }
 
     String? initialAccountId;
@@ -396,8 +401,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Divider(color: isDark ? AppColors.darkBorderSubtle : null),
                 ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.primaryContainer,
-                    child: Icon(Icons.account_balance_wallet_rounded, color: isDark ? primaryColor : AppColors.primary),
+                    backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.primaryContainerColor(isDark),
+                    child: Icon(Icons.account_balance_wallet_rounded, color: isDark ? primaryColor : AppColors.primaryAction(isDark)),
                   ),
                   title: Text(
                     'All Accounts',
@@ -431,8 +436,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: color.withValues(alpha: 0.15),
-                      child: Icon(acc.account.iconData, color: color),
+                      backgroundColor: AppColors.accountIconBackground(color, isDark),
+                      child: Icon(acc.account.iconData, color: AppColors.accountIconColor(color, isDark)),
                     ),
                     title: Text(
                       acc.account.name,
@@ -611,7 +616,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           // 1. Top Header with Brand Primary, Hamburger Menu, Account Switcher, Balance, and EXPENSES/INCOME tabs
           AppHeader(
-            backgroundColor: isDark ? AppColors.darkSurface : AppColors.primary,
+            backgroundColor: isDark ? AppColors.darkSurface : AppColors.primaryAction(isDark),
             borderRadius: const BorderRadius.vertical(
               bottom: Radius.circular(30),
             ),
@@ -747,7 +752,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       ),
                                       Divider(color: isDark ? AppColors.darkBorderSubtle : null),
                                       ...accounts.map((accItem) => ListTile(
-                                        leading: Icon(accItem.account.iconData, color: Color(accItem.account.color ?? (isDark ? primaryColor.toARGB32() : AppColors.primary.toARGB32()))),
+                                        leading: Icon(
+                                          accItem.account.iconData,
+                                          color: AppColors.accountIconColor(
+                                            accItem.account.color != null ? Color(accItem.account.color!) : null,
+                                            isDark,
+                                          ),
+                                        ),
                                         title: Text(
                                           accItem.account.name,
                                           style: TextStyle(
@@ -954,6 +965,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       },
                                     ),
                                   ),
+                                  // Recent Transactions Section (if enabled in settings)
+                                  if (settings.showRecentTransactions) ...[
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Recent Transactions',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          style: TextButton.styleFrom(
+                                            visualDensity: VisualDensity.compact,
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          ),
+                                          onPressed: () {
+                                            MainNavigationService.navigateToTab(context, 1);
+                                          },
+                                          child: Text(
+                                            'View All',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildRecentTransactionsList(
+                                      context: context,
+                                      txProvider: txProvider,
+                                      isDark: isDark,
+                                      filter: filter,
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
                                   const SizedBox(height: 20),
                                 ],
                               ),
@@ -965,7 +1018,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             bottom: 14,
                             right: 14,
                             child: Material(
-                              color: AppColors.floatingAction,
+                              color: AppColors.floatingActionButton(isDark),
                               shape: const CircleBorder(),
                               elevation: 4,
                               shadowColor: Colors.black26,
@@ -991,13 +1044,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ]);
                                   }
                                 },
-                                child: const SizedBox(
+                                child: SizedBox(
                                   width: 52,
                                   height: 52,
                                   child: Icon(
                                     Icons.add_rounded,
                                     size: 32,
-                                    color: Color(0xFF1B1E24),
+                                    color: AppColors.floatingActionButtonIcon(isDark),
                                   ),
                                 ),
                               ),
@@ -1013,6 +1066,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRecentTransactionsList({
+    required BuildContext context,
+    required TransactionProvider txProvider,
+    required bool isDark,
+    required DashboardFilterState filter,
+  }) {
+    var items = txProvider.ledgerItems;
+    if (filter.accountId != null) {
+      items = items
+          .where((it) => it.accountId == filter.accountId || it.destinationAccountId == filter.accountId)
+          .toList();
+    }
+    final recentItems = items.take(5).toList();
+
+    if (recentItems.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurfaceElevated.withValues(alpha: 0.5) : const Color(0xFFF6F5F2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            'No recent transactions',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: recentItems.map((item) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: TransactionListItem(
+            item: item,
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AddEditTransactionScreen(transaction: item),
+                ),
+              );
+              if (mounted) {
+                await Future.wait([
+                  context.read<AccountProvider>().loadAccounts(),
+                  txProvider.loadLedger(),
+                  if (_filterState != null) _updateFilter(_filterState!),
+                ]);
+              }
+            },
+          ),
+        );
+      }).toList(),
     );
   }
 }

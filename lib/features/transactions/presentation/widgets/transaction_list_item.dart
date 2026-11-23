@@ -56,16 +56,15 @@ class TransactionListItem extends StatelessWidget {
 
     final categoryColor = item.categoryColor != null ? Color(item.categoryColor!) : iconColor;
     final formattedAmount = item.amount.format(currency: settings.currency);
-    final hasAttachment = item.receiptPath != null && item.receiptPath!.isNotEmpty;
 
-    return Container(
+    final card = Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurfaceCard : AppColors.lightSurfaceCard,
+        color: AppColors.surfaceCard(isDark),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          color: AppColors.border(isDark),
           width: 1,
         ),
       ),
@@ -165,12 +164,12 @@ class TransactionListItem extends StatelessWidget {
                             color: isDark ? Theme.of(context).colorScheme.primary : AppColors.primaryLight,
                           ),
                         ],
-                        if (hasAttachment) ...[
+                        if (item.receiptPaths.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           GestureDetector(
                             onTap: () => PhotoPreviewDialog.show(
                               context,
-                              imagePath: item.receiptPath!,
+                              imagePaths: item.receiptPaths,
                               title: item.categoryName ?? item.description,
                             ),
                             child: Container(
@@ -185,7 +184,9 @@ class TransactionListItem extends StatelessWidget {
                                   Icon(Icons.photo_rounded, size: 12, color: isDark ? Theme.of(context).colorScheme.primary : AppColors.primary),
                                   const SizedBox(width: 2),
                                   Text(
-                                    'Photo',
+                                    item.receiptPaths.length > 1
+                                        ? '${item.receiptPaths.length} Photos'
+                                        : 'Photo',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
@@ -290,5 +291,7 @@ class TransactionListItem extends StatelessWidget {
           ),
         ),
       );
+
+    return card;
   }
 }

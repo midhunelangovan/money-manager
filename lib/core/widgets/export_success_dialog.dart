@@ -15,6 +15,12 @@ enum ExportFileType {
   backup,
 }
 
+enum ExportSuccessAction {
+  done,
+  viewHistory,
+  openFolder,
+}
+
 class ExportSuccessDialog extends StatelessWidget {
   final File file;
   final ExportFileType type;
@@ -49,7 +55,7 @@ class ExportSuccessDialog extends StatelessWidget {
     final size = fileSizeBytes ?? await file.length();
     if (!context.mounted) return;
 
-    showDialog(
+    showDialog<ExportSuccessAction>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => ExportSuccessDialog(
@@ -57,7 +63,20 @@ class ExportSuccessDialog extends StatelessWidget {
         type: type,
         fileSizeBytes: size,
       ),
-    );
+    ).then((action) async {
+      if (action == null || !context.mounted) return;
+      if (action == ExportSuccessAction.viewHistory) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ExportHistoryScreen(
+              highlightFilePath: file.path,
+            ),
+          ),
+        );
+      } else if (action == ExportSuccessAction.openFolder) {
+        await StorageHelper.openExportFolder(context, file: file);
+      }
+    });
   }
 
   @override
@@ -146,14 +165,14 @@ class ExportSuccessDialog extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: isExcel
+                            color: (isExcel && !AppColors.isMinimalMode)
                                 ? const Color(0xFF059669).withValues(alpha: 0.15)
                                 : primaryAccent.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
                             isExcel ? Icons.table_chart_rounded : Icons.backup_rounded,
-                            color: isExcel ? const Color(0xFF059669) : primaryAccent,
+                            color: (isExcel && !AppColors.isMinimalMode) ? const Color(0xFF059669) : primaryAccent,
                             size: 20,
                           ),
                         ),
@@ -329,19 +348,10 @@ class ExportSuccessDialog extends StatelessWidget {
                       'Export History',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ExportHistoryScreen(
-                            highlightFilePath: file.path,
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: () => Navigator.pop(context, ExportSuccessAction.viewHistory),
                   ),
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context, ExportSuccessAction.done),
                     child: const Text(
                       'Done',
                       style: TextStyle(
@@ -361,8 +371,7 @@ class ExportSuccessDialog extends StatelessWidget {
   }
 
   Future<void> _openFolderOrFiles(BuildContext context) async {
-    Navigator.pop(context);
-    await StorageHelper.openExportFolder(context, file: file);
+    Navigator.pop(context, ExportSuccessAction.openFolder);
   }
 
   Future<void> _shareFile(BuildContext context) async {

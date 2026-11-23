@@ -19,11 +19,11 @@ class NotificationService {
   static bool isTestMode = false;
 
   static const String channelId = 'kals_reminders_channel_v2';
-  static const String channelName = 'Personal Reminders Dev';
+  static const String channelName = 'Personal Reminders';
   static const String channelDescription = 'Offline personal reminders and financial alerts';
 
   static const String exportChannelId = 'kals_exports_channel_v2';
-  static const String exportChannelName = 'Export & Backup Reports Dev';
+  static const String exportChannelName = 'Export & Backup Reports';
   static const String exportChannelDescription = 'Status notifications when scheduled or manual exports complete';
 
   Future<void> initialize() async {
@@ -551,7 +551,12 @@ class NotificationService {
     return getNotificationId('rec_$recurringId');
   }
 
-  tz.TZDateTime? calculateNextRecurringTrigger(RecurringTransaction recurring, tz.TZDateTime now) {
+  tz.TZDateTime? calculateNextRecurringTrigger(
+    RecurringTransaction recurring,
+    tz.TZDateTime now, {
+    int reminderHour = 9,
+    int reminderMinute = 0,
+  }) {
     var execDate = recurring.nextExecutionDate;
 
     // Advance occurrence if the trigger time for this occurrence is already in the past
@@ -567,8 +572,8 @@ class NotificationService {
         triggerDate.year,
         triggerDate.month,
         triggerDate.day,
-        9, // 9:00 AM local time
-        0,
+        reminderHour,
+        reminderMinute,
       );
 
       if (triggerTz.isAfter(now)) {
@@ -585,7 +590,11 @@ class NotificationService {
     return null;
   }
 
-  Future<void> scheduleRecurringReminder(RecurringTransaction recurring) async {
+  Future<void> scheduleRecurringReminder(
+    RecurringTransaction recurring, {
+    int reminderHour = 9,
+    int reminderMinute = 0,
+  }) async {
     if (!recurring.remindMe || !recurring.isActive) {
       await cancelRecurringReminder(recurring.id);
       return;
@@ -605,7 +614,12 @@ class NotificationService {
       }
 
       final now = tz.TZDateTime.now(tz.local);
-      final scheduledDateTime = calculateNextRecurringTrigger(recurring, now);
+      final scheduledDateTime = calculateNextRecurringTrigger(
+        recurring,
+        now,
+        reminderHour: reminderHour,
+        reminderMinute: reminderMinute,
+      );
 
       if (scheduledDateTime == null) {
         return;
@@ -718,12 +732,20 @@ class NotificationService {
     }
   }
 
-  Future<void> rescheduleAllRecurringReminders(List<RecurringTransaction> recurringList) async {
+  Future<void> rescheduleAllRecurringReminders(
+    List<RecurringTransaction> recurringList, {
+    int reminderHour = 9,
+    int reminderMinute = 0,
+  }) async {
     try {
       await initialize();
       for (final rec in recurringList) {
         if (rec.remindMe && rec.isActive) {
-          await scheduleRecurringReminder(rec);
+          await scheduleRecurringReminder(
+            rec,
+            reminderHour: reminderHour,
+            reminderMinute: reminderMinute,
+          );
         } else {
           await cancelRecurringReminder(rec.id);
         }

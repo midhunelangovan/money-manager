@@ -277,12 +277,12 @@ class ExcelExportService {
       final sStr = '${s.year}-${s.month.toString().padLeft(2, '0')}-${s.day.toString().padLeft(2, '0')}';
       final eStr = '${e.year}-${e.month.toString().padLeft(2, '0')}-${e.day.toString().padLeft(2, '0')}';
       if (sStr == eStr) {
-        fileName = 'Kals_V2_Transactions_$sStr${AppConstants.excelFileExtension}';
+        fileName = 'Kals_Transactions_$sStr${AppConstants.excelFileExtension}';
       } else {
-        fileName = 'Kals_V2_Transactions_${sStr}_to_$eStr${AppConstants.excelFileExtension}';
+        fileName = 'Kals_Transactions_${sStr}_to_$eStr${AppConstants.excelFileExtension}';
       }
     } else {
-      fileName = 'Kals_V2_Transactions_${DateFormatter.formatBackupStamp(now)}${AppConstants.excelFileExtension}';
+      fileName = 'Kals_Transactions_${DateFormatter.formatBackupStamp(now)}${AppConstants.excelFileExtension}';
     }
 
     final file = await StorageHelper.saveToPublicDownloads(

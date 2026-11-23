@@ -217,9 +217,14 @@ class _DonutChartPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
 
+    final isMinimal = AppColors.isMinimalMode;
+    final chartPalette = AppColors.chartPalette(isDark);
+
     // Background track ring in clean subtle border neutral
     final bgPaint = Paint()
-      ..color = isDark ? AppColors.darkBorder : AppColors.lightBorder
+      ..color = isMinimal
+          ? (isDark ? AppColors.minimalDarkBorder : AppColors.minimalLightBorder)
+          : (isDark ? const Color(0xFF1E3A42) : AppColors.lightBorder)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
 
@@ -230,7 +235,9 @@ class _DonutChartPainter extends CustomPainter {
       final innerRadius = radius - strokeWidth / 2 - 8;
       if (innerRadius > 0) {
         final dashedPaint = Paint()
-          ..color = isDark ? Colors.white12 : AppColors.lightBorderSubtle
+          ..color = isMinimal
+              ? (isDark ? AppColors.minimalDarkBorderSubtle : AppColors.minimalLightBorderSubtle)
+              : (isDark ? const Color(0xFF2E535C) : AppColors.lightBorderSubtle)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.2;
 
@@ -250,14 +257,29 @@ class _DonutChartPainter extends CustomPainter {
     if (totalValue <= 0) return;
 
     double startAngle = -math.pi / 2; // Start from 12 o'clock
-    const double gapAngle = 0.03; // small subtle separation gap between segments
+    const double gapAngle = 0.035; // clean subtle separation gap between segments
 
-    for (final segment in segments) {
+    for (int i = 0; i < segments.length; i++) {
+      final segment = segments[i];
       final sweepAngle = (segment.value / totalValue) * 2 * math.pi;
       if (sweepAngle <= 0) continue;
 
+      Color segmentColor;
+      if (isMinimal) {
+        segmentColor = chartPalette[i % chartPalette.length];
+      } else {
+        segmentColor = segment.color;
+        if (isDark) {
+          // Boost contrast and luminance for dark mode backgrounds
+          final hsl = HSLColor.fromColor(segmentColor);
+          if (hsl.lightness < 0.45) {
+            segmentColor = hsl.withLightness(math.min(0.65, hsl.lightness + 0.20)).toColor();
+          }
+        }
+      }
+
       final paint = Paint()
-        ..color = segment.color
+        ..color = segmentColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..strokeCap = segments.length == 1 ? StrokeCap.round : StrokeCap.butt;

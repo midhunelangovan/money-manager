@@ -147,6 +147,72 @@ class AppearanceSettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Text(
+                    'Minimalist Mode',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  AppCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: settings.isMinimalMode
+                                ? (isDark ? theme.colorScheme.primary.withValues(alpha: 0.2) : AppColors.primaryContainer)
+                                : (isDark ? AppColors.darkSurfaceElevated : AppColors.lightBorder.withValues(alpha: 0.4)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.filter_b_and_w_rounded,
+                            color: settings.isMinimalMode
+                                ? (isDark ? theme.colorScheme.primary : AppColors.primary)
+                                : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Minimal Mode',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Distraction-free grayscale aesthetic across the application, independent of light or dark theme.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: settings.isMinimalMode,
+                          activeTrackColor: isDark ? theme.colorScheme.primary : AppColors.primary,
+                          onChanged: (val) => settings.setMinimalMode(val),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
                     'Design System',
                     style: TextStyle(
                       fontSize: 13,

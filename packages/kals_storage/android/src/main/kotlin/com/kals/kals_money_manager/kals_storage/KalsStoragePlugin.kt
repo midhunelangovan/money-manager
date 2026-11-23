@@ -1,108 +1,120 @@
-package com.kals.kals_money_manager.dev
+package com.kals.kals_money_manager.kals_storage
 
 import android.app.DownloadManager
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import io.flutter.embedding.android.FlutterActivity
-import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler
+import io.flutter.plugin.common.MethodChannel.Result
 import java.io.File
 
-class MainActivity : FlutterActivity() {
+/**
+ * Native MediaStore storage plugin for Kals Money Manager.
+ * Registered on ALL FlutterEngines (both foreground UI and headless background WorkManager workers),
+ * ensuring reliable public Downloads access across Android versions without depending on MainActivity.
+ */
+class KalsStoragePlugin : FlutterPlugin, MethodCallHandler {
 
-    private val CHANNEL = "com.kals.kals_money_manager.dev/widget_channel"
-    private var methodChannel: MethodChannel? = null
-    private var initialAction: String? = null
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        handleIntent(intent)
+    companion object {
+        const val CHANNEL_WIDGET = "com.kals.kals_money_manager/widget_channel"
+        const val CHANNEL_STORAGE = "com.kals.kals_money_manager/storage_channel"
+        const val LEGACY_CHANNEL_WIDGET = "com.kals.kals_money_manager.dev/widget_channel"
+        const val LEGACY_CHANNEL_STORAGE = "com.kals.kals_money_manager.dev/storage_channel"
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleIntent(intent)
+    private var channelWidget: MethodChannel? = null
+    private var channelStorage: MethodChannel? = null
+    private var legacyChannelWidget: MethodChannel? = null
+    private var legacyChannelStorage: MethodChannel? = null
+    private var context: Context? = null
+
+    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        context = flutterPluginBinding.applicationContext
+
+        channelWidget = MethodChannel(flutterPluginBinding.binaryMessenger, CHANNEL_WIDGET)
+        channelWidget?.setMethodCallHandler(this)
+
+        channelStorage = MethodChannel(flutterPluginBinding.binaryMessenger, CHANNEL_STORAGE)
+        channelStorage?.setMethodCallHandler(this)
+
+        legacyChannelWidget = MethodChannel(flutterPluginBinding.binaryMessenger, LEGACY_CHANNEL_WIDGET)
+        legacyChannelWidget?.setMethodCallHandler(this)
+
+        legacyChannelStorage = MethodChannel(flutterPluginBinding.binaryMessenger, LEGACY_CHANNEL_STORAGE)
+        legacyChannelStorage?.setMethodCallHandler(this)
     }
 
-    private fun handleIntent(intent: Intent?) {
-        val action = intent?.action
-        if (action == KalsAppWidgetProvider.ACTION_ADD_EXPENSE || action == KalsAppWidgetProvider.ACTION_ADD_INCOME) {
-            val actionType = if (action == KalsAppWidgetProvider.ACTION_ADD_EXPENSE) "expense" else "income"
-            if (methodChannel != null) {
-                methodChannel?.invokeMethod("onWidgetAction", actionType)
-            } else {
-                initialAction = actionType
+    override fun onMethodCall(call: MethodCall, result: Result) {
+        val appContext = context
+        if (appContext == null) {
+            result.error("NO_CONTEXT", "Application context is not available", null)
+            return
+        }
+
+        when (call.method) {
+            "saveFileToPublicDownloads" -> {
+                try {
+                    val bytes = call.argument<ByteArray>("bytes")
+                        ?: throw IllegalArgumentException("bytes cannot be null")
+                    val fileName = call.argument<String>("fileName")
+                        ?: throw IllegalArgumentException("fileName cannot be null")
+                    val mimeType = call.argument<String>("mimeType")
+                        ?: "application/octet-stream"
+
+                    val res = saveFileToPublicDownloads(appContext, bytes, fileName, mimeType)
+                    result.success(res)
+                } catch (e: Exception) {
+                    result.error("SAVE_FAILED", e.message, null)
+                }
             }
+            "getPublicExportedFiles" -> {
+                try {
+                    val files = getPublicExportedFiles(appContext)
+                    result.success(files)
+                } catch (e: Exception) {
+                    result.error("QUERY_FAILED", e.message, null)
+                }
+            }
+            "openFolder" -> {
+                val path = call.argument<String>("path")
+                val opened = openFolderInFileViewer(appContext, path)
+                result.success(opened)
+            }
+            else -> result.notImplemented()
         }
     }
 
-    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        super.configureFlutterEngine(flutterEngine)
-        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-        methodChannel?.setMethodCallHandler { call, result ->
-            when (call.method) {
-                "getInitialAction" -> {
-                    val action = initialAction
-                    initialAction = null
-                    result.success(action)
-                }
-                "openFolder" -> {
-                    val path = call.argument<String>("path")
-                    val opened = openFolderInFileViewer(path)
-                    result.success(opened)
-                }
-                "saveFileToPublicDownloads" -> {
-                    try {
-                        val bytes = call.argument<ByteArray>("bytes")
-                            ?: throw IllegalArgumentException("bytes cannot be null")
-                        val fileName = call.argument<String>("fileName")
-                            ?: throw IllegalArgumentException("fileName cannot be null")
-                        val mimeType = call.argument<String>("mimeType")
-                            ?: "application/octet-stream"
-
-                        val res = saveFileToPublicDownloads(bytes, fileName, mimeType)
-                        result.success(res)
-                    } catch (e: Exception) {
-                        result.error("SAVE_FAILED", e.message, null)
-                    }
-                }
-                "getPublicExportedFiles" -> {
-                    try {
-                        val files = getPublicExportedFiles()
-                        result.success(files)
-                    } catch (e: Exception) {
-                        result.error("QUERY_FAILED", e.message, null)
-                    }
-                }
-                else -> result.notImplemented()
-            }
-        }
-
-        // Deliver initial action if queued before engine initialization
-        if (initialAction != null) {
-            val action = initialAction
-            initialAction = null
-            methodChannel?.invokeMethod("onWidgetAction", action)
-        }
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channelWidget?.setMethodCallHandler(null)
+        channelWidget = null
+        channelStorage?.setMethodCallHandler(null)
+        channelStorage = null
+        legacyChannelWidget?.setMethodCallHandler(null)
+        legacyChannelWidget = null
+        legacyChannelStorage?.setMethodCallHandler(null)
+        legacyChannelStorage = null
+        context = null
     }
 
     private fun saveFileToPublicDownloads(
+        ctx: Context,
         bytes: ByteArray,
         fileName: String,
         mimeType: String
     ): Map<String, Any?> {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val resolvedName = getSafeUniqueFileName(downloadsDir, fileName)
+        val resolvedName = getSafeUniqueFileName(ctx, downloadsDir, fileName)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val contentResolver = applicationContext.contentResolver
+            val contentResolver = ctx.contentResolver
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, resolvedName)
                 put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
@@ -124,7 +136,7 @@ class MainActivity : FlutterActivity() {
                 contentResolver.update(uri, contentValues, null, null)
 
                 val canonicalFile = File(downloadsDir, resolvedName)
-                val resolvedPath = getAbsolutePathFromUri(uri) ?: canonicalFile.absolutePath
+                val resolvedPath = getAbsolutePathFromUri(ctx, uri) ?: canonicalFile.absolutePath
 
                 // Verification check: ensure file is non-empty and readable
                 var verified = false
@@ -169,7 +181,7 @@ class MainActivity : FlutterActivity() {
             }
 
             MediaScannerConnection.scanFile(
-                applicationContext,
+                ctx,
                 arrayOf(targetFile.absolutePath),
                 arrayOf(mimeType),
                 null
@@ -189,7 +201,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun getSafeUniqueFileName(dir: File, originalName: String): String {
+    private fun getSafeUniqueFileName(ctx: Context, dir: File, originalName: String): String {
         val dotIndex = originalName.lastIndexOf('.')
         val baseName = if (dotIndex > 0) originalName.substring(0, dotIndex) else originalName
         val extension = if (dotIndex > 0) originalName.substring(dotIndex) else ""
@@ -197,14 +209,14 @@ class MainActivity : FlutterActivity() {
         var candidateName = originalName
         var counter = 1
 
-        while (isFileExistsInDownloads(dir, candidateName)) {
+        while (isFileExistsInDownloads(ctx, dir, candidateName)) {
             candidateName = "$baseName ($counter)$extension"
             counter++
         }
         return candidateName
     }
 
-    private fun isFileExistsInDownloads(dir: File, name: String): Boolean {
+    private fun isFileExistsInDownloads(ctx: Context, dir: File, name: String): Boolean {
         val directFile = File(dir, name)
         if (directFile.exists()) return true
 
@@ -213,7 +225,7 @@ class MainActivity : FlutterActivity() {
                 val projection = arrayOf(MediaStore.MediaColumns._ID)
                 val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
                 val selectionArgs = arrayOf(name, "${Environment.DIRECTORY_DOWNLOADS}%")
-                applicationContext.contentResolver.query(
+                ctx.contentResolver.query(
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI,
                     projection,
                     selection,
@@ -227,10 +239,10 @@ class MainActivity : FlutterActivity() {
         return false
     }
 
-    private fun getAbsolutePathFromUri(uri: Uri): String? {
+    private fun getAbsolutePathFromUri(ctx: Context, uri: Uri): String? {
         try {
             val projection = arrayOf(MediaStore.MediaColumns.DATA)
-            applicationContext.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            ctx.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
                 val dataIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
                 if (dataIndex != -1 && cursor.moveToFirst()) {
                     val path = cursor.getString(dataIndex)
@@ -243,7 +255,7 @@ class MainActivity : FlutterActivity() {
         return null
     }
 
-    private fun getPublicExportedFiles(): List<Map<String, Any>> {
+    private fun getPublicExportedFiles(ctx: Context): List<Map<String, Any>> {
         val results = mutableListOf<Map<String, Any>>()
         val seenPaths = mutableSetOf<String>()
 
@@ -260,7 +272,7 @@ class MainActivity : FlutterActivity() {
                 val selectionArgs = arrayOf("${Environment.DIRECTORY_DOWNLOADS}%")
                 val sortOrder = "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
 
-                applicationContext.contentResolver.query(
+                ctx.contentResolver.query(
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI,
                     projection,
                     selection,
@@ -323,26 +335,23 @@ class MainActivity : FlutterActivity() {
         return results
     }
 
-    private fun openFolderInFileViewer(folderPath: String?): Boolean {
-        // 1. Try opening Downloads folder via DownloadManager
+    private fun openFolderInFileViewer(ctx: Context, folderPath: String?): Boolean {
         try {
             val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
+            ctx.startActivity(intent)
             return true
         } catch (_: Exception) {}
 
-        // 2. Try DocumentsUI Downloads Provider
         try {
             val uri = Uri.parse("content://com.android.providers.downloads.documents/root/downloads")
             val intent = Intent(Intent.ACTION_VIEW)
             intent.setDataAndType(uri, "vnd.android.cursor.dir/download")
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
+            ctx.startActivity(intent)
             return true
         } catch (_: Exception) {}
 
-        // 3. Try opening specific directory via Intent
         if (!folderPath.isNullOrEmpty()) {
             try {
                 val dir = File(folderPath)
@@ -351,7 +360,7 @@ class MainActivity : FlutterActivity() {
                     val intent = Intent(Intent.ACTION_VIEW)
                     intent.setDataAndType(uri, "resource/folder")
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    startActivity(intent)
+                    ctx.startActivity(intent)
                     return true
                 }
             } catch (_: Exception) {}
@@ -361,7 +370,7 @@ class MainActivity : FlutterActivity() {
                 val uri = Uri.parse(folderPath)
                 intent.setDataAndType(uri, "*/*")
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                startActivity(intent)
+                ctx.startActivity(intent)
                 return true
             } catch (_: Exception) {}
         }

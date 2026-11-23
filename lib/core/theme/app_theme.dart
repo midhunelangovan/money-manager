@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'app_colors.dart';
 
 class AppTheme {
-  static ThemeData lightTheme([AppAccentColor accent = AppAccentColor.slateBlue]) {
-    final primaryColor = accent.primary;
-    final primaryLightColor = accent.primaryLight;
-    final primaryContainerColor = accent.container;
+  static ThemeData lightTheme([AppAccentColor accent = AppAccentColor.slateBlue, bool isMinimalMode = false]) {
+    final primaryColor = isMinimalMode ? AppColors.minimalLightPrimary : accent.primary;
+    final primaryLightColor = isMinimalMode ? AppColors.minimalLightSecondary : accent.primaryLight;
+    final primaryContainerColor = isMinimalMode ? AppColors.minimalLightPrimaryContainer : accent.container;
 
     final colorScheme = ColorScheme.light(
       primary: primaryColor,
@@ -15,88 +15,94 @@ class AppTheme {
       onPrimaryContainer: primaryColor,
       secondary: primaryLightColor,
       onSecondary: Colors.white,
-      surface: AppColors.lightSurface,
-      onSurface: AppColors.lightTextPrimary,
-      surfaceContainerHighest: AppColors.lightSurfaceElevated,
-      error: AppColors.expense,
+      surface: isMinimalMode ? AppColors.minimalLightSurface : AppColors.lightSurface,
+      onSurface: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary,
+      surfaceContainerHighest: isMinimalMode ? AppColors.minimalLightSurfaceElevated : AppColors.lightSurfaceElevated,
+      error: isMinimalMode ? AppColors.minimalLightTextSecondary : AppColors.expense,
       onError: Colors.white,
-      outline: AppColors.lightBorder,
-      outlineVariant: AppColors.lightBorderSubtle,
+      outline: isMinimalMode ? AppColors.minimalLightBorder : AppColors.lightBorder,
+      outlineVariant: isMinimalMode ? AppColors.minimalLightBorderSubtle : AppColors.lightBorderSubtle,
     );
 
-    const textTheme = TextTheme(
-      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.lightTextPrimary, letterSpacing: -0.8),
-      displayMedium: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary, letterSpacing: -0.5),
-      displaySmall: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary, letterSpacing: -0.3),
-      headlineMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary, letterSpacing: -0.2),
-      headlineSmall: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.lightTextPrimary, letterSpacing: -0.1),
-      titleLarge: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary, letterSpacing: -0.1),
-      titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.lightTextPrimary),
-      titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.lightTextPrimary),
-      bodyLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.lightTextPrimary),
-      bodyMedium: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, color: AppColors.lightTextSecondary),
-      bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.lightTextTertiary),
-      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.lightTextPrimary),
-      labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.lightTextSecondary, letterSpacing: 0.3),
-      labelSmall: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.lightTextTertiary, letterSpacing: 0.5),
+    final textTheme = TextTheme(
+      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary, letterSpacing: -0.8),
+      displayMedium: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary, letterSpacing: -0.5),
+      displaySmall: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary, letterSpacing: -0.3),
+      headlineMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary, letterSpacing: -0.2),
+      headlineSmall: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary, letterSpacing: -0.1),
+      titleLarge: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary, letterSpacing: -0.1),
+      titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary),
+      titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary),
+      bodyLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary),
+      bodyMedium: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, color: isMinimalMode ? AppColors.minimalLightTextSecondary : AppColors.lightTextSecondary),
+      bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: isMinimalMode ? AppColors.minimalLightTextTertiary : AppColors.lightTextTertiary),
+      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary),
+      labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalLightTextSecondary : AppColors.lightTextSecondary, letterSpacing: 0.3),
+      labelSmall: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalLightTextTertiary : AppColors.lightTextTertiary, letterSpacing: 0.5),
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.lightBackground,
-      canvasColor: AppColors.lightBackground,
+      scaffoldBackgroundColor: isMinimalMode ? AppColors.minimalLightBackground : AppColors.lightBackground,
+      canvasColor: isMinimalMode ? AppColors.minimalLightBackground : AppColors.lightBackground,
       fontFamily: 'Inter',
       textTheme: textTheme,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.lightSurface,
-        foregroundColor: AppColors.lightTextPrimary,
+      appBarTheme: AppBarTheme(
+        backgroundColor: isMinimalMode ? AppColors.minimalLightSurface : AppColors.lightSurface,
+        foregroundColor: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary,
         elevation: 0,
         scrolledUnderElevation: 0.5,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        systemOverlayStyle: SystemUiOverlayStyle(
+        systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.dark,
         ),
         titleTextStyle: TextStyle(
-          color: AppColors.lightTextPrimary,
+          color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.2,
         ),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.lightSurfaceCard,
+        color: isMinimalMode ? AppColors.minimalLightSurfaceCard : AppColors.lightSurfaceCard,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.lightBorder, width: 1),
+          side: BorderSide(color: isMinimalMode ? AppColors.minimalLightBorder : AppColors.lightBorder, width: 1),
         ),
         margin: EdgeInsets.zero,
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: AppColors.lightSurfaceCard,
+        backgroundColor: isMinimalMode ? AppColors.minimalLightSurfaceCard : AppColors.lightSurfaceCard,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          color: AppColors.lightTextPrimary,
+          color: isMinimalMode ? AppColors.minimalLightTextPrimary : AppColors.lightTextPrimary,
         ),
-        contentTextStyle: const TextStyle(
+        contentTextStyle: TextStyle(
           fontSize: 14,
-          color: AppColors.lightTextSecondary,
+          color: isMinimalMode ? AppColors.minimalLightTextSecondary : AppColors.lightTextSecondary,
         ),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.lightSurfaceCard,
-        modalBackgroundColor: AppColors.lightSurfaceCard,
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: isMinimalMode ? AppColors.minimalLightSurfaceCard : AppColors.lightSurfaceCard,
+        modalBackgroundColor: isMinimalMode ? AppColors.minimalLightSurfaceCard : AppColors.lightSurfaceCard,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: isMinimalMode ? AppColors.minimalLightPrimary : AppColors.floatingAction,
+        foregroundColor: isMinimalMode ? Colors.white : const Color(0xFF1B1E24),
+        elevation: 3,
+        shape: const CircleBorder(),
       ),
       drawerTheme: const DrawerThemeData(
         backgroundColor: AppColors.lightSurface,
@@ -343,100 +349,107 @@ class AppTheme {
     );
   }
 
-  static ThemeData darkTheme([AppAccentColor accent = AppAccentColor.slateBlue]) {
-    final darkPrimaryColor = accent.darkPrimary;
-    final darkContainerColor = accent.darkContainer;
+  static ThemeData darkTheme([AppAccentColor accent = AppAccentColor.slateBlue, bool isMinimalMode = false]) {
+    final darkPrimaryColor = isMinimalMode ? AppColors.minimalDarkPrimary : accent.darkPrimary;
+    final darkPrimaryLightColor = isMinimalMode ? AppColors.minimalDarkSecondary : accent.primaryLight;
+    final darkContainerColor = isMinimalMode ? AppColors.minimalDarkPrimaryContainer : accent.darkContainer;
 
     final colorScheme = ColorScheme.dark(
       primary: darkPrimaryColor,
-      onPrimary: AppColors.darkBackground,
+      onPrimary: isMinimalMode ? AppColors.minimalDarkBackground : AppColors.darkBackground,
       primaryContainer: darkContainerColor,
-      onPrimaryContainer: darkPrimaryColor,
-      secondary: darkPrimaryColor,
-      onSecondary: AppColors.darkBackground,
-      surface: AppColors.darkSurface,
-      onSurface: AppColors.darkTextPrimary,
-      surfaceContainerHighest: AppColors.darkSurfaceElevated,
-      error: AppColors.expense,
-      onError: Colors.white,
-      outline: AppColors.darkBorder,
-      outlineVariant: AppColors.darkBorderSubtle,
+      onPrimaryContainer: isMinimalMode ? AppColors.minimalDarkTextPrimary : darkPrimaryColor,
+      secondary: darkPrimaryLightColor,
+      onSecondary: isMinimalMode ? AppColors.minimalDarkBackground : AppColors.darkBackground,
+      surface: isMinimalMode ? AppColors.minimalDarkSurface : AppColors.darkSurface,
+      onSurface: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary,
+      surfaceContainerHighest: isMinimalMode ? AppColors.minimalDarkSurfaceElevated : AppColors.darkSurfaceElevated,
+      error: isMinimalMode ? AppColors.minimalDarkTextSecondary : AppColors.expense,
+      onError: isMinimalMode ? AppColors.minimalDarkBackground : Colors.white,
+      outline: isMinimalMode ? AppColors.minimalDarkBorder : AppColors.darkBorder,
+      outlineVariant: isMinimalMode ? AppColors.minimalDarkBorderSubtle : AppColors.darkBorderSubtle,
     );
 
-    const textTheme = TextTheme(
-      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.darkTextPrimary, letterSpacing: -0.8),
-      displayMedium: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.darkTextPrimary, letterSpacing: -0.5),
-      displaySmall: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.darkTextPrimary, letterSpacing: -0.3),
-      headlineMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.darkTextPrimary, letterSpacing: -0.2),
-      headlineSmall: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.darkTextPrimary, letterSpacing: -0.1),
-      titleLarge: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.darkTextPrimary, letterSpacing: -0.1),
-      titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.darkTextPrimary),
-      titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.darkTextPrimary),
-      bodyLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.darkTextPrimary),
-      bodyMedium: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, color: AppColors.darkTextSecondary),
-      bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.darkTextTertiary),
-      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.darkTextPrimary),
-      labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.darkTextSecondary, letterSpacing: 0.3),
-      labelSmall: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.darkTextTertiary, letterSpacing: 0.5),
+    final textTheme = TextTheme(
+      displayLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary, letterSpacing: -0.8),
+      displayMedium: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary, letterSpacing: -0.5),
+      displaySmall: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary, letterSpacing: -0.3),
+      headlineMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary, letterSpacing: -0.2),
+      headlineSmall: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary, letterSpacing: -0.1),
+      titleLarge: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary, letterSpacing: -0.1),
+      titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary),
+      titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary),
+      bodyLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary),
+      bodyMedium: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, color: isMinimalMode ? AppColors.minimalDarkTextSecondary : AppColors.darkTextSecondary),
+      bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: isMinimalMode ? AppColors.minimalDarkTextTertiary : AppColors.darkTextTertiary),
+      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary),
+      labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalDarkTextSecondary : AppColors.darkTextSecondary, letterSpacing: 0.3),
+      labelSmall: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: isMinimalMode ? AppColors.minimalDarkTextTertiary : AppColors.darkTextTertiary, letterSpacing: 0.5),
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.darkBackground,
-      canvasColor: AppColors.darkBackground,
+      scaffoldBackgroundColor: isMinimalMode ? AppColors.minimalDarkBackground : AppColors.darkBackground,
+      canvasColor: isMinimalMode ? AppColors.minimalDarkBackground : AppColors.darkBackground,
       fontFamily: 'Inter',
-      iconTheme: const IconThemeData(color: AppColors.darkIconPrimary, size: 24),
+      iconTheme: IconThemeData(color: isMinimalMode ? AppColors.minimalDarkIconPrimary : AppColors.darkIconPrimary, size: 24),
       textTheme: textTheme,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.darkSurface,
-        foregroundColor: AppColors.darkTextPrimary,
+      appBarTheme: AppBarTheme(
+        backgroundColor: isMinimalMode ? AppColors.minimalDarkSurface : AppColors.darkSurface,
+        foregroundColor: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary,
         elevation: 0,
         scrolledUnderElevation: 0.5,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        systemOverlayStyle: SystemUiOverlayStyle(
+        systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
         ),
         titleTextStyle: TextStyle(
-          color: AppColors.darkTextPrimary,
+          color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.2,
         ),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.darkSurfaceCard,
+        color: isMinimalMode ? AppColors.minimalDarkSurfaceCard : AppColors.darkSurfaceCard,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.darkBorder, width: 1),
+          side: BorderSide(color: isMinimalMode ? AppColors.minimalDarkBorder : AppColors.darkBorder, width: 1),
         ),
         margin: EdgeInsets.zero,
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: AppColors.darkSurfaceCard,
+        backgroundColor: isMinimalMode ? AppColors.minimalDarkSurfaceCard : AppColors.darkSurfaceCard,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          color: AppColors.darkTextPrimary,
+          color: isMinimalMode ? AppColors.minimalDarkTextPrimary : AppColors.darkTextPrimary,
         ),
-        contentTextStyle: const TextStyle(
+        contentTextStyle: TextStyle(
           fontSize: 14,
-          color: AppColors.darkTextSecondary,
+          color: isMinimalMode ? AppColors.minimalDarkTextSecondary : AppColors.darkTextSecondary,
         ),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.darkSurfaceCard,
-        modalBackgroundColor: AppColors.darkSurfaceCard,
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: isMinimalMode ? AppColors.minimalDarkSurfaceCard : AppColors.darkSurfaceCard,
+        modalBackgroundColor: isMinimalMode ? AppColors.minimalDarkSurfaceCard : AppColors.darkSurfaceCard,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: isMinimalMode ? AppColors.minimalDarkPrimary : AppColors.floatingAction,
+        foregroundColor: isMinimalMode ? AppColors.minimalDarkBackground : const Color(0xFF1B1E24),
+        elevation: 3,
+        shape: const CircleBorder(),
       ),
       drawerTheme: const DrawerThemeData(
         backgroundColor: AppColors.darkSurface,

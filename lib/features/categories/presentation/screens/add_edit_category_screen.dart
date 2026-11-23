@@ -86,6 +86,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 
   Future<void> _save() async {
+    if (_isSaving) return;
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       setState(() => _errorMessage = 'Please enter a category name');
@@ -128,7 +129,10 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
 
       if (mounted) {
         final isEdit = widget.initialCategory != null;
-        Navigator.pop(context, _type);
+        final route = ModalRoute.of(context);
+        if (route != null && route.isCurrent) {
+          Navigator.pop(context, _type);
+        }
         WidgetsBinding.instance.addPostFrameCallback((_) {
           final rootContext = MainNavigationService.navigatorKey.currentContext;
           if (rootContext != null && rootContext.mounted) {

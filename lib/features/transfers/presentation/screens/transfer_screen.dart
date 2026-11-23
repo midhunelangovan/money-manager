@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utilities/app_snack_bar.dart';
 import '../../../../core/utilities/date_formatter.dart';
 import '../../../../core/utilities/id_generator.dart';
+import '../../../../core/utilities/indian_number_formatter.dart';
 import '../../../../core/utilities/money.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_header.dart';
@@ -90,13 +91,13 @@ class _TransferScreenState extends State<TransferScreen> {
       return;
     }
 
-    final parsedAmount = double.tryParse(_amountController.text.trim()) ?? 0.0;
-    if (parsedAmount <= 0) {
+    final parsedUnits = IndianNumberFormatter.parseToUnits(_amountController.text);
+    if (parsedUnits <= 0) {
       AppSnackBar.showError(context, 'Please enter a valid transfer amount greater than 0.');
       return;
     }
 
-    final transferMoney = Money(units: (parsedAmount * 100).round());
+    final transferMoney = Money(units: parsedUnits);
 
     setState(() => _isSaving = true);
 
@@ -252,10 +253,10 @@ class _TransferScreenState extends State<TransferScreen> {
                             width: 32,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: AppColors.transfer.withValues(alpha: 0.12),
+                              color: AppColors.transferColor(isDark).withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.arrow_downward_rounded, color: AppColors.transfer, size: 18),
+                            child: Icon(Icons.arrow_downward_rounded, color: AppColors.transferColor(isDark), size: 18),
                           ),
                         ),
                       ),
@@ -353,6 +354,9 @@ class _TransferScreenState extends State<TransferScreen> {
                         controller: _amountController,
                         hintText: '0.00',
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          IndianNumberTextInputFormatter(maxDecimalDigits: 2),
+                        ],
                         prefixIcon: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Text(
